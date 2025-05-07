@@ -1,0 +1,3 @@
+[submodule "src/segment/models/BiomedParse"]
+	path = src/segment/models/BiomedParse
+	url = https://github.com/microsoft/BiomedParse.git
