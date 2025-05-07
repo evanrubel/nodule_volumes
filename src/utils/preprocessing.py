@@ -4,7 +4,7 @@ import SimpleITK as sitk
 
 # File format conversions #
 
-def dicom_to_nifti(dicom_folder_path: str, nifti_path: str) -> None
+def dicom_to_nifti(dicom_folder_path: str, nifti_path: str) -> None:
     """
     Converts the DICOM slices in `dicom_folder_path` to a single NIfTI file.
     Writes the NIfTI to `nifti_path`.

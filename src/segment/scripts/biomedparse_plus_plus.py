@@ -178,28 +178,3 @@ def main(config: dict) -> None:
         with open(os.path.join(config["output_dir"], "skipped.json"), "w") as f:
             json.dump(skipped, f, indent=4)
     
-
-if __name__ == "__main__":
-    config = {
-        "dataset": "nlst",
-
-        "device": 0,
-
-        "debug": False,
-    }
-    
-
-    if config["dataset"] == "nlst":
-        config["nifti_dir"] = "/data/scratch/erubel/nlst/niftis"
-        config["output_dir"] = f"/data/scratch/erubel/nlst/biomedparse++/{config['experiment_name']}"
-        config["vessel_mask_dir"] = "/data/scratch/erubel/nlst/lung_vessels"
-    elif config["dataset"] == "utc":
-        config["nifti_dir"] = "/data/scratch/erubel/external_val/utc/data"
-        config["output_dir"] = f"/data/scratch/erubel/external_val/utc/experiments/biomedparse++/{config['experiment_name']}"
-        config["vessel_mask_dir"] = "/data/scratch/erubel/external_val/utc/experiments/lung_vessels"
-    
-    config["lung_mask_dir"] = f"/data/rbg/scratch/lung_ct/{config['dataset'].replace('_benign', '')}_lung_mask"
-    
-    os.makedirs(config["output_dir"], exist_ok=True)
-
-    main(config)
