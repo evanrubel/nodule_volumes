@@ -13,8 +13,7 @@ from PIL import Image
 from pprint import pprint
 import pickle
 
-# TODO: handle this
-sys.path.append("/data/rbg/users/erubel/volumetry/models/BiomedParse")
+sys.path.append("../models/BiomedParse")
 
 from modeling.BaseModel import BaseModel
 from modeling import build_model
@@ -25,58 +24,6 @@ from utilities.constants import BIOMED_CLASSES
 
 from inference_utils.inference import interactive_infer_image, interactive_infer_image_all
 from inference_utils.processing_utils import process_intensity_image
-
-
-def get_nifti_nib(series_id: str, config: dict):
-    """Checks all subfolders and returns the matching Nibabel object (for `series_id`) within those subfolders."""
-    
-    if any(["group" in f for f in os.listdir(config["nifti_dir"])]):
-        # look in subdivided groups
-        for f in os.listdir(config["nifti_dir"]):
-            if "group" in f and os.path.isdir(os.path.join(config["nifti_dir"], f)):
-                for dir_fname in os.listdir(os.path.join(config["nifti_dir"], f)):
-                    if dir_fname == f"{series_id}_0000.nii.gz":
-                        return nib.load(os.path.join(config["nifti_dir"], f, dir_fname))
-    elif len([f for f in os.listdir(config["nifti_dir"]) if f.endswith(".nii.gz")]) >= 1:
-        # in one directory
-        return nib.load(os.path.join(config["nifti_dir"], f"{series_id}_0000.nii.gz"))
-    
-    raise FileNotFoundError
-
-
-def get_sorted_filenames(config: dict) -> list[str]:
-    """Returns the sorted filenames to process based on `config.`"""
-
-    all_filenames = []
-
-    if any(["group" in f for f in os.listdir(config["nifti_dir"])]):
-        # look in subdivided groups
-        for f in os.listdir(config["nifti_dir"]):
-            if "group" in f and os.path.isdir(os.path.join(config["nifti_dir"], f)):
-                all_filenames.extend(os.listdir(os.path.join(config["nifti_dir"], f)))
-    elif len([f for f in os.listdir(config["nifti_dir"]) if f.endswith(".nii.gz")]) >= 1:
-        # in one directory
-        all_filenames.extend([fname for fname in os.listdir(os.path.join(config["nifti_dir"])) if fname.endswith(".nii.gz")])
-    else:
-        raise NotImplementedError
-        
-    all_filenames_sorted = sorted(all_filenames)
-
-    if config["group_ix"] == "all":
-        return all_filenames_sorted
-    else:
-        assert isinstance(config["group_ix"], int) and isinstance(config["total_num_groups"], int)
-        assert config["group_ix"] in range(config["total_num_groups"])
-
-        start_ix = (len(all_filenames_sorted) // config["total_num_groups"]) * config["group_ix"]
-        stop_ix = (len(all_filenames_sorted) // config["total_num_groups"]) * (config["group_ix"] + 1)
-
-        if config["group_ix"] == config["total_num_groups"] - 1: # last one
-            print(f"Going from {start_ix} to {len(all_filenames_sorted) - 1}...")
-            return all_filenames_sorted[start_ix:]
-        else:
-            print(f"Going from {start_ix} to {stop_ix}...")
-            return all_filenames_sorted[start_ix:stop_ix]
 
 
 def inference_nifti_recognition(
@@ -121,15 +68,12 @@ def inference_nifti_recognition(
 def get_model(config: dict):
     """Returns the BiomedParse model."""
 
-    opt = load_opt_from_config_files(["/data/rbg/users/erubel/volumetry/models/BiomedParse/configs/biomedparse_inference.yaml"])
+    opt = load_opt_from_config_files(["configs/biomedparse_inference.yaml"])
     opt = init_distributed(opt)
     opt["device"] = torch.device("cuda", config["device"])
     torch.cuda.set_device(config["device"])
 
-    # load model from pretrained weights
-    pretrained_pth = "/data/rbg/users/erubel/volumetry_old/src/BiomedParse/pretrained/biomed_parse.pt"
-
-    model = BaseModel(opt, build_model(opt)).from_pretrained(pretrained_pth).eval().to(f"cuda:{config['device']}")
+    model = BaseModel(opt, build_model(opt)).from_pretrained("../checkpoints/biomedparse_v1.pt").eval().to(f"cuda:{config['device']}")
     with torch.no_grad():
         model.model.sem_seg_head.predictor.lang_encoder.get_text_embeddings(BIOMED_CLASSES + ["background"], is_eval=True)
 
@@ -184,7 +128,7 @@ def insert_p_values(model, image_array_slice: np.ndarray, image_shape: tuple, co
 def main(config: dict) -> None:
     """Runs the BiomedParse++ inference pipeline."""
 
-    with open(os.path.join(config["output_dir"], f"config_{config['group_ix']}.json"), "w") as f:
+    with open(os.path.join(config["output_dir"], "config.json"), "w") as f:
         json.dump(config, f, indent=4)
 
     skipped = []
@@ -231,7 +175,7 @@ def main(config: dict) -> None:
                 print(f"Skipping {series_id} due to error {str(e)}...")
                 skipped.append(series_id)
     
-        with open(os.path.join(config["output_dir"], f"skipped_group_{config['group_ix']}.json"), "w") as f:
+        with open(os.path.join(config["output_dir"], "skipped.json"), "w") as f:
             json.dump(skipped, f, indent=4)
     
 
@@ -240,38 +184,10 @@ if __name__ == "__main__":
         "dataset": "nlst",
 
         "device": 0,
-        "group_ix": 0,
-
-        "use_lung_mask": False,
-        "use_vessel_mask": False,
-
-        "p_value_threshold": 0.0, # it is best to keep this as 0.0 and then filter in downstream scripts (e.g., postprocess.py, utc_inference_evaluation.py, etc.)
-    
-        "total_num_groups": 12,
 
         "debug": False,
     }
     
-    assert config["dataset"] in {"nlst", "utc"}
-    assert 0 <= config["p_value_threshold"] <= 1
-    assert 0 <= config["group_ix"] < config["total_num_groups"]
-
-    config["experiment_name"] = f"p_{config['p_value_threshold']}"
-
-    if config["use_lung_mask"]:
-        config["experiment_name"] += "_with_lung_mask"
-    else:
-        config["experiment_name"] += "_no_lung_mask"
-
-    if config["use_vessel_mask"]:
-        config["experiment_name"] += "_with_vessel_mask"
-    else:
-        config["experiment_name"] += "_no_vessel_mask"
-    
-
-    print("\n\n")
-    pprint(config)
-    print("\n\n")
 
     if config["dataset"] == "nlst":
         config["nifti_dir"] = "/data/scratch/erubel/nlst/niftis"
