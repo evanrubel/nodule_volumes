@@ -13,6 +13,7 @@ from PIL import Image
 from pprint import pprint
 import pickle
 
+# TODO: handle this
 sys.path.append("/data/rbg/users/erubel/volumetry/models/BiomedParse")
 
 from modeling.BaseModel import BaseModel
@@ -76,26 +77,6 @@ def get_sorted_filenames(config: dict) -> list[str]:
         else:
             print(f"Going from {start_ix} to {stop_ix}...")
             return all_filenames_sorted[start_ix:stop_ix]
-
-
-def inference_nifti(
-    model,
-    raw_image_array: np.ndarray,
-    text_prompts: list[str],
-    is_CT: bool,
-    site: str = None,
-    show: bool = True,
-):
-    assert len(raw_image_array.shape) == 2
-    
-    image = process_intensity_image(raw_image_array, is_CT, site)
-
-    pred_mask = interactive_infer_image(model, Image.fromarray(image), text_prompts)
-
-    if show:
-        plot_segmentation_masks(image, pred_mask, text_prompts, rotate=rotate)
-    
-    return image, pred_mask
 
 
 def inference_nifti_recognition(
@@ -200,28 +181,6 @@ def insert_p_values(model, image_array_slice: np.ndarray, image_shape: tuple, co
         raise Exception
 
 
-def get_probabilities(model, image_array_slice: np.ndarray, image_shape: tuple, prompts: list[str], config: dict) -> np.ndarray:
-    """Returns the raw probabilities from the BiomedParse model."""
-
-    _, pred_masks = inference_nifti(
-        model=model,
-        raw_image_array=image_array_slice,
-        text_prompts=["nodule"], # can also change to ["tumor"]
-        is_CT=True,
-        site="lung",
-        show=False,
-    )
-
-    assert len(pred_masks) == 1, "Expected a single mask corresponding to a single prompt."
-
-    # note we do interpolate here, so the probabilities are smoothed
-
-    return F.interpolate(
-        torch.from_numpy(pred_masks[0]).unsqueeze(0).unsqueeze(0),
-        image_shape[1:],
-    ).numpy()
-
-
 def main(config: dict) -> None:
     """Runs the BiomedParse++ inference pipeline."""
 
@@ -232,15 +191,6 @@ def main(config: dict) -> None:
 
     model = get_model(config)
 
-    # TODO: clean this up by moving to the same directory
-    if config["dataset"] == "nlst":
-        with open("/data/rbg/users/erubel/volumetry/notebooks/sam2/pid_to_exam_by_timepoint.p", "rb") as f:
-            pid_to_exam_by_timepoint = pickle.load(f)
-    elif config["dataset"] == "nlst_benign":
-        with open("/data/rbg/scratch/nlst_benign_nodules/v1/pid_to_exam_by_timepoint.p", "rb") as f:
-            pid_to_exam_by_timepoint = pickle.load(f)
-    ###
-
     for fname in tqdm(get_sorted_filenames(config)):
         if fname.endswith(".nii.gz"):
             try:
@@ -248,10 +198,7 @@ def main(config: dict) -> None:
 
                 # load image
                 image = get_nifti_nib(series_id, config)
-                image_array = image.get_fdata()
-
-                if "nlst" not in config["dataset"]:
-                    image_array = np.transpose(image_array, (2, 1, 0))
+                image_array = np.transpose(image.get_fdata(), (2, 1, 0)) # send to (z, y, x)
 
                 image_shape = image_array.shape
 
@@ -264,18 +211,12 @@ def main(config: dict) -> None:
                 
                 # run inference
                 for slice_num in tqdm(range(image_shape[0])):
-                    if config["insert_p_values"]:
-                        candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
+                    candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
 
-                        if candidate_slice_mask is not None:
-                            output_mask[slice_num] = candidate_slice_mask
-                    else:
-                        output_mask[slice_num] = get_probabilities(model, image_array[slice_num], image_shape, config)
+                    if candidate_slice_mask is not None:
+                        output_mask[slice_num] = candidate_slice_mask
 
-                if "nlst" not in config["dataset"]:
-                    final_mask = np.transpose(output_mask, (2, 1, 0))
-                else:
-                    final_mask = output_mask
+                final_mask = np.transpose(output_mask, (2, 1, 0))
 
                 if config["debug"]:
                     print("Mask values:", np.unique(final_mask).tolist())
@@ -307,8 +248,6 @@ if __name__ == "__main__":
         "p_value_threshold": 0.0, # it is best to keep this as 0.0 and then filter in downstream scripts (e.g., postprocess.py, utc_inference_evaluation.py, etc.)
     
         "total_num_groups": 12,
-
-        "insert_p_values": True, # this is for slice-wise p-values (otherwise, False means we do instance-wise [experimental])
 
         "debug": False,
     }
