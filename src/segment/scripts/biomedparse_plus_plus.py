@@ -13,7 +13,7 @@ from PIL import Image
 from pprint import pprint
 import pickle
 
-sys.path.append("../models/BiomedParse")
+sys.path.append(os.path.join(os.getcwd(), "segment", "models", "BiomedParse"))
 
 from modeling.BaseModel import BaseModel
 from modeling import build_model
@@ -33,16 +33,12 @@ def inference_nifti_recognition(
     is_CT: bool,
     targets_to_include: list[str],
     site: str = None,
-    p_value_threshold: float = None,
     show: bool = True,
     verbose: bool = False,
 ):
     """
     Runs the object recognition pipeline for a given `image_type`, including
     `targets_to_include` only.
-
-    If `p_value_threshold` is not None, we filter out any targets that do not
-    meet `p_value_threshold`.
     
     We use this over the other `inference_nifti` function because this uses a more
     intelligent p-value filter over all possible targets in the given `image_type`
@@ -54,7 +50,7 @@ def inference_nifti_recognition(
     
     image = process_intensity_image(raw_image_array, is_CT, site)
     
-    predictions, p_values = interactive_infer_image_all(model, Image.fromarray(image), image_type, p_value_threshold, batch_size=2, verbose=verbose)
+    predictions, p_values = interactive_infer_image_all(model, Image.fromarray(image), image_type, batch_size=2)
 
     targets = [t for t in list(predictions.keys()) if t in targets_to_include]
     pred_masks = [predictions[t] for t in targets]
@@ -68,12 +64,12 @@ def inference_nifti_recognition(
 def get_model(config: dict):
     """Returns the BiomedParse model."""
 
-    opt = load_opt_from_config_files(["configs/biomedparse_inference.yaml"])
+    opt = load_opt_from_config_files([os.path.join(os.getcwd(), "segment", "models", "BiomedParse", "configs", "biomedparse_inference.yaml")])
     opt = init_distributed(opt)
     opt["device"] = torch.device("cuda", config["device"])
     torch.cuda.set_device(config["device"])
 
-    model = BaseModel(opt, build_model(opt)).from_pretrained("../checkpoints/biomedparse_v1.pt").eval().to(f"cuda:{config['device']}")
+    model = BaseModel(opt, build_model(opt)).from_pretrained(os.path.join(os.getcwd(), "segment", "checkpoints", "biomedparse_v1.pt")).eval().to(f"cuda:{config['device']}")
     with torch.no_grad():
         model.model.sem_seg_head.predictor.lang_encoder.get_text_embeddings(BIOMED_CLASSES + ["background"], is_eval=True)
 
@@ -93,7 +89,6 @@ def insert_p_values(model, image_array_slice: np.ndarray, image_shape: tuple, co
         is_CT=True,
         targets_to_include=["nodule", "tumor"], # do not include the third target in this image type ("COVID-19 infection")
         site='lung',
-        p_value_threshold=config["p_value_threshold"],
         show=False,
         verbose=config["debug"],
     )
@@ -135,46 +130,46 @@ def main(config: dict) -> None:
 
     model = get_model(config)
 
-    for fname in tqdm(get_sorted_filenames(config)):
+    for fname in tqdm(sorted(os.listdir(config["nifti_dir"]))):
         if fname.endswith(".nii.gz"):
-            try:
-                series_id = fname.replace("_0000.nii.gz", "")
+            # try:
+            print("bring back try except")
+            series_id = fname.replace("_0000.nii.gz", "")
 
-                # load image
-                image = get_nifti_nib(series_id, config)
-                image_array = np.transpose(image.get_fdata(), (2, 1, 0)) # send to (z, y, x)
+            # load image
+            image = nib.load(os.path.join(config["nifti_dir"], fname))
+            image_array = np.transpose(image.get_fdata(), (2, 1, 0)) # send to (z, y, x)
 
-                image_shape = image_array.shape
+            image_shape = image_array.shape
 
-                if config["debug"]:
-                    print(f"Image Shape: {image_shape}")
-                
-                assert image_shape[1] == image_shape[2], "Expected a square image."
+            if config["debug"]:
+                print(f"Image Shape: {image_shape}")
+            
+            assert image_shape[1] == image_shape[2], "Expected a square image."
 
-                output_mask = np.zeros(image_shape)
-                
-                # run inference
-                for slice_num in tqdm(range(image_shape[0])):
-                    candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
+            output_mask = np.zeros(image_shape)
+            
+            # run inference
+            for slice_num in tqdm(range(image_shape[0])[10:20]):
+                candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
 
-                    if candidate_slice_mask is not None:
-                        output_mask[slice_num] = candidate_slice_mask
+                if candidate_slice_mask is not None:
+                    output_mask[slice_num] = candidate_slice_mask
 
-                final_mask = np.transpose(output_mask, (2, 1, 0))
+            final_mask = np.transpose(output_mask, (2, 1, 0))
 
-                if config["debug"]:
-                    print("Mask values:", np.unique(final_mask).tolist())
-                    print("Final before saving", final_mask.shape)
-                
-                # save final output
-                nib.save(
-                    nib.Nifti1Image(final_mask, affine=image.affine, header=image.header),
-                    os.path.join(config["output_dir"], f"{series_id.replace('_0000', '')}.nii.gz"),
-                )
-            except Exception as e:
-                print(f"Skipping {series_id} due to error {str(e)}...")
-                skipped.append(series_id)
+            if config["debug"]:
+                print("Mask values:", np.unique(final_mask).tolist())
+                print("Final before saving", final_mask.shape)
+            
+            # save final output
+            nib.save(
+                nib.Nifti1Image(final_mask, affine=image.affine, header=image.header),
+                os.path.join(config["output_dir"], f"{series_id.replace('_0000', '')}.nii.gz"),
+            )
+            # except Exception as e:
+            #     print(f"Skipping {series_id} due to error {str(e)}...")
+            #     skipped.append(series_id)
     
         with open(os.path.join(config["output_dir"], "skipped.json"), "w") as f:
             json.dump(skipped, f, indent=4)
-    

@@ -12,5 +12,5 @@ def main(config: dict) -> None:
     # Initial "detection" step with BiomedParse++
     biomedparse_plus_plus.main(config)
 
-    # # Segmentation step where we smooth the outputs with nnInteractive
-    nnInteractive.main(config)
+    # Segmentation step where we smooth the outputs with nnInteractive
+    # nnInteractive.main(config)

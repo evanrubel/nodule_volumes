@@ -40,7 +40,9 @@ if __name__ == "__main__":
     assert "device" in config and "debug" in config, "Expected a well-formed configuration file."
 
     if config["debug"]:
+        print("\n")
         pprint(config)
+        print("\n")
     
     os.makedirs(config["output_dir"])
 
@@ -60,11 +62,8 @@ if __name__ == "__main__":
     # now, we can proceed with the remainder of our pipeline
      
     if task == "segment":
-        exit()
         segment.main(config)
-
 
     elif task == "register":
         raise NotImplementedError
-        sys.path.append("register/scripts")
         register.main(config)
