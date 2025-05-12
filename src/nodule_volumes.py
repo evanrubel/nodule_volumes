@@ -10,6 +10,8 @@ from pprint import pprint
 import sys
 
 if __name__ == "__main__":
+    # example: python nodule_volumes.py -t segment -d toy -v
+
     # read in command-line arguments
 
     parser = argparse.ArgumentParser(description="Run task with the specified dataset")
@@ -33,8 +35,8 @@ if __name__ == "__main__":
     with open(f"../data/{dataset}/config.json") as f:
         config = json.load(f) | {
             "debug": verbose,
-            "output_dir": f"../data/{dataset}/results/{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            "nifti_dir": f"../data/{dataset}/images",
+            "output_dir": os.path.abspath(f"../data/{dataset}/results/{datetime.now().strftime('%Y%m%d_%H%M%S')}"),
+            "nifti_dir": os.path.abspath(f"../data/{dataset}/images"),
         }
     
     assert "device" in config and "debug" in config, "Expected a well-formed configuration file."
