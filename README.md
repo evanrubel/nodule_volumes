@@ -1,6 +1,6 @@
 # nodule_volumes
 
-Note that we have a git submodule for the [BiomedParse](https://github.com/microsoft/BiomedParse) repository at `src/segment/models/BiomedParse`.
+Note that we have a synced fork for the [BiomedParse](https://github.com/evanrubel/BiomedParse) repository at `src/segment/models/BiomedParse`. We also have a git submodule for the [nnInteractive](https://github.com/MIC-DKFZ/nnInteractive) repository at `src/segment/models/nnInteractive`.
 
 TODOs
 

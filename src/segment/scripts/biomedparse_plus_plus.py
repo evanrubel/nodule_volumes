@@ -13,6 +13,10 @@ from PIL import Image
 from pprint import pprint
 import pickle
 
+from utils.segment_evaluator import NoduleSegmentEvaluator
+from utils.misc import is_binary_array
+from utils.postprocessing import get_lung_slice_range, get_lung_mask, apply_lung_mask_and_retain_whole_instances, remove_flashing_entities
+
 sys.path.append(os.path.join(os.getcwd(), "segment", "models", "BiomedParse"))
 
 from modeling.BaseModel import BaseModel
@@ -120,56 +124,90 @@ def insert_p_values(model, image_array_slice: np.ndarray, image_shape: tuple, co
         raise Exception
 
 
+def postprocess(raw_mask: np.ndarray, series_id: str, image, evaluator, config: dict) -> np.ndarray:
+    """Postprocesses the raw mask from BiomedParse."""
+
+    instance_mask_array = evaluator.get_instance_segmentation(np.expand_dims(raw_mask, axis=0))[0]
+
+    if config["lung_mask_mode"] in {"mask", "range"}:
+        lung_mask = get_lung_mask(series_id, config)
+            
+        assert instance_mask_array.shape == lung_mask.shape
+        
+        if config["debug"]:
+            print("Premask", instance_mask_array.shape)
+            print("Mask", lung_mask.shape)
+            nib.save(
+                nib.Nifti1Image(np.transpose(lung_mask, (2, 1, 0)), affine=image.affine, header=image.header),
+                os.path.join(config["output_dir"], f"{series_id.replace('_0000', '')}_lung_mask.nii.gz"),
+            )
+
+        # sometimes, there are stray instance slices separated by several slices, so we use the lung *range* to clean those up
+        extreme_slice_mask = get_lung_mask(series_id, config | {"lung_mask_mode": "range"})
+        final_lung_mask = apply_lung_mask_and_retain_whole_instances(instance_mask_array, lung_mask, config) * extreme_slice_mask
+    else:
+        final_lung_mask = np.ones(mask_array.shape, dtype=np.uint8) # do nothing!
+    
+    # final_lung_mask = np.transpose(final_lung_mask, (2, 1, 0))
+    
+    assert is_binary_array(final_lung_mask)
+
+    output_mask = raw_mask * final_lung_mask
+
+    return remove_flashing_entities((output_mask > config["p_f_threshold"]).astype(np.uint8), config)
+
+
 def main(config: dict) -> None:
     """Runs the BiomedParse++ inference pipeline."""
-
-    with open(os.path.join(config["output_dir"], "config.json"), "w") as f:
-        json.dump(config, f, indent=4)
 
     skipped = []
 
     model = get_model(config)
 
+    evaluator = NoduleSegmentEvaluator()
+
     for fname in tqdm(sorted(os.listdir(config["nifti_dir"]))):
         if fname.endswith(".nii.gz"):
-            # try:
-            print("bring back try except")
-            series_id = fname.replace("_0000.nii.gz", "")
+            try:
+                series_id = fname.replace("_0000", "").replace(".nii.gz", "")
 
-            # load image
-            image = nib.load(os.path.join(config["nifti_dir"], fname))
-            image_array = np.transpose(image.get_fdata(), (2, 1, 0)) # send to (z, y, x)
+                # load image
+                image = nib.load(os.path.join(config["nifti_dir"], fname))
+                image_array = np.transpose(image.get_fdata(), (2, 1, 0)) # send to (z, y, x)
 
-            image_shape = image_array.shape
+                image_shape = image_array.shape
 
-            if config["debug"]:
-                print(f"Image Shape: {image_shape}")
-            
-            assert image_shape[1] == image_shape[2], "Expected a square image."
+                if config["debug"]:
+                    print(f"Image Shape: {image_shape}")
+                
+                assert image_shape[1] == image_shape[2], "Expected a square image."
 
-            output_mask = np.zeros(image_shape)
-            
-            # run inference
-            for slice_num in tqdm(range(image_shape[0])[10:20]):
-                candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
+                output_mask = np.zeros(image_shape)
+                
+                # run inference
+                for slice_num in range(image_shape[0])[140:240]:
+                    candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
 
-                if candidate_slice_mask is not None:
-                    output_mask[slice_num] = candidate_slice_mask
+                    if candidate_slice_mask is not None:
+                        output_mask[slice_num] = candidate_slice_mask
 
-            final_mask = np.transpose(output_mask, (2, 1, 0))
+                postprocessed_mask = postprocess(output_mask, series_id, image, evaluator, config)
 
-            if config["debug"]:
-                print("Mask values:", np.unique(final_mask).tolist())
-                print("Final before saving", final_mask.shape)
-            
-            # save final output
-            nib.save(
-                nib.Nifti1Image(final_mask, affine=image.affine, header=image.header),
-                os.path.join(config["output_dir"], f"{series_id.replace('_0000', '')}.nii.gz"),
-            )
-            # except Exception as e:
-            #     print(f"Skipping {series_id} due to error {str(e)}...")
-            #     skipped.append(series_id)
+                final_mask = np.transpose(postprocessed_mask, (2, 1, 0))
+
+                if config["debug"]:
+                    print("Mask values:", np.unique(final_mask).tolist())
+                    print("Final before saving", final_mask.shape)
+                
+                # save final output
+                nib.save(
+                    nib.Nifti1Image(final_mask, affine=image.affine, header=image.header),
+                    os.path.join(config["output_dir"], f"{series_id.replace('_0000', '')}_inital.nii.gz"),
+                )
+
+            except Exception as e:
+                print(f"Skipping {series_id} due to error {str(e)}...")
+                skipped.append(series_id)
     
-        with open(os.path.join(config["output_dir"], "skipped.json"), "w") as f:
+        with open(os.path.join(config["output_dir"], "biomedparse++_skipped.json"), "w") as f:
             json.dump(skipped, f, indent=4)
