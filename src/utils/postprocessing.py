@@ -8,9 +8,9 @@ from skimage.morphology import convex_hull_image
 from scipy.ndimage.morphology import binary_dilation, generate_binary_structure
 import pydicom
 from tqdm import tqdm
-from p_tqdm import p_map
 from argparse import ArgumentParser
 import pickle
+import nibabel as nib
 
 # Lung Masks #
 
@@ -36,23 +36,26 @@ import pickle
 #     )
 
 def get_pixels_hu_nifti(img):
-    image = img.get_fdata(dtype=np.float32)  # ensures float representation if scaling is needed
+    # we transpose here to go from (x, y, z) -> (z, y, x)
+    img_arr = np.transpose(img.get_fdata(dtype=np.float32), (2, 1, 0))  # ensures float representation if scaling is needed
 
     # apply scaling if necessary (slope and intercept)
     slope = img.header.get_slope_inter()  # returns (slope, intercept)
     if slope is not None:
         rescale_slope, rescale_intercept = slope
         if rescale_slope is not None:
-            image = image * rescale_slope
+            img_arr = img_arr * rescale_slope
         if rescale_intercept is not None:
-            image = image + rescale_intercept
+            img_arr = img_arr + rescale_intercept
 
     # get spacing information: [slice_thickness, pixel_spacing_row, pixel_spacing_col]
     header = img.header
-    zooms = header.get_zooms()  # TODO: check this ordering
-    spacing = np.array(zooms, dtype=np.float32)
+    zooms = header.get_zooms()
 
-    return image.astype(np.int16), spacing
+    # as above, we reverse order of zooms [which is of size (3,)] to go from (x, y, z) -> (z, y, x)
+    spacing = np.array(zooms, dtype=np.float32)[::-1]
+
+    return img_arr.astype(np.int16), spacing
 
 
 def binarize_per_slice(
@@ -348,11 +351,13 @@ def generate_single_lung_mask(fname: str, series_id: str, config: dict) -> None:
     dm1 = process_mask(m1)
     dm2 = process_mask(m2)
     dilatedMask = dm1 + dm2
-    Mask = m1 + m2
+    final_mask = m1 + m2
 
-    np.save(os.path.join(config["dataset_dir"], "lung_masks", f"{series_id}.npy"), "Mask")
-
-    # np.save(os.path.join(config["f"/data/rbg/scratch/lung_ct/luna_lung_mask/sample_{exam['exam']}.npy", Mask)
+    # transpose from (z, y, x) to (x, y, z)
+    nib.save(
+        nib.Nifti1Image(np.transpose(final_mask, (2, 1, 0)), affine=img.affine, header=img.header),
+        os.path.join(config["dataset_dir"], "lung_masks", f"{series_id}.nii.gz"),
+    )
 
 
 def get_lung_slice_range(lung_mask: np.ndarray) -> tuple[int, int]:
