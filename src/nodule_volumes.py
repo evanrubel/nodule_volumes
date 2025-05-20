@@ -12,7 +12,6 @@ from pprint import pprint
 
 if __name__ == "__main__":
     # read in command-line arguments
-
     parser = argparse.ArgumentParser(description="Run task with the specified dataset")
 
     parser.add_argument("-t", "--task", required=True, help="Task name ('segment' or 'register')")
@@ -30,7 +29,6 @@ if __name__ == "__main__":
     assert os.path.isdir(f"../data/{dataset}/images") and os.path.isfile(f"../data/{dataset}/config.json"), "Expected the dataset directory to be well-formed."
 
     # configuration
-
     with open(f"../data/{dataset}/config.json") as f:
         config = json.load(f) | {
             "debug": verbose,
@@ -42,11 +40,14 @@ if __name__ == "__main__":
             "registered_masks_dir": os.path.abspath(f"../data/{dataset}/results/{datetime.now().strftime('%Y%m%d_%H%M%S')}/registered_masks"),
         }
     
-    for k in ["device", "debug", "p_f_threshold", "lung_mask_mode", "prompt_type", "prompt_subset_type"]:
+    for k in ["device", "debug", "p_f_threshold", "lung_vessel_overlap_threshold", "lung_mask_mode", "prompt_type", "prompt_subset_type"]:
         assert k in config, "Expected a well-formed configuration file."
 
     # BiomedParse++    
-    assert 0 <= isinstance(config["p_f_threshold"], (float, int)) <= 1, "Expected a valid threshold for p_f."
+    assert isinstance(config["p_f_threshold"], (float, int)) and 0 <= config["p_f_threshold"] <= 1, "Expected a valid threshold for p_f."
+
+    # Postprocessing
+    assert (isinstance(config["lung_vessel_overlap_threshold"], (float, int)) and 0 <= config["lung_vessel_overlap_threshold"] <= 1) or config["lung_vessel_overlap_threshold"] is None, "Expected a valid threshold for lung_vessel_overlap."
     assert config["lung_mask_mode"] in {"mask", "range", False}
 
     # nnInteractive
@@ -63,6 +64,7 @@ if __name__ == "__main__":
     
     # can already exist
     os.makedirs(os.path.join(config["dataset_dir"], "lung_masks"), exist_ok=True)
+    os.makedirs(os.path.join(config["dataset_dir"], "lung_vessel_masks"), exist_ok=True)
     os.makedirs(config["transforms_dir"], exist_ok=True)
 
     with open(os.path.join(config["output_dir"], "experiment_config.json"), "w") as f:
