@@ -15,7 +15,7 @@ import pickle
 
 from utils.segment_evaluator import NoduleSegmentEvaluator
 from utils.misc import is_binary_array
-from utils.postprocessing import get_lung_slice_range, get_lung_mask, apply_lung_mask_and_retain_whole_instances, remove_flashing_entities
+from utils.postprocessing import get_lung_slice_range, get_lung_mask, apply_lung_mask_and_retain_whole_instances, apply_vessel_mask_and_remove_whole_instances, remove_flashing_entities
 
 sys.path.append(os.path.join(os.getcwd(), "segment", "models", "BiomedParse"))
 
@@ -129,6 +129,8 @@ def postprocess(raw_mask: np.ndarray, series_id: str, image, evaluator, config: 
 
     instance_mask_array = evaluator.get_instance_segmentation(np.expand_dims(raw_mask, axis=0))[0]
 
+    # Lung Mask
+
     if config["lung_mask_mode"] in {"mask", "range"}:
         lung_mask = get_lung_mask(series_id, config)
             
@@ -148,11 +150,28 @@ def postprocess(raw_mask: np.ndarray, series_id: str, image, evaluator, config: 
     else:
         final_lung_mask = np.ones(mask_array.shape, dtype=np.uint8) # do nothing!
     
+    # Lung Vessel Mask
+    
+    if config["use_vessel_mask"]:
+        # keep as boolean for now
+        vessel_mask_arr = nib.load(os.path.join(config["dataset_dir"], "lung_vessel_masks", f"{series_id}.nii.gz")).get_fdata() > 0 # include trachea too
+
+        # if "nlst" not in config["dataset"]:
+        vessel_mask_arr = np.transpose(vessel_mask_arr, (2, 1, 0))
+
+        assert instance_mask_array.shape == vessel_mask_arr.shape
+        assert instance_mask_array.shape == final_lung_mask.shape
+
+        # we incorporate the lung mask here to speed up processing
+        final_lung_vessel_mask = apply_vessel_mask_and_remove_whole_instances(instance_mask_array * final_lung_mask, vessel_mask_arr.astype(np.uint8), config)
+    else:
+        final_lung_vessel_mask = np.ones(mask_array.shape, dtype=np.uint8) # do nothing!
+    
     # final_lung_mask = np.transpose(final_lung_mask, (2, 1, 0))
     
     assert is_binary_array(final_lung_mask)
 
-    output_mask = raw_mask * final_lung_mask
+    output_mask = raw_mask * final_lung_mask * final_lung_vessel_mask
 
     return remove_flashing_entities((output_mask > config["p_f_threshold"]).astype(np.uint8), config)
 

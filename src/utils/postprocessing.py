@@ -12,6 +12,7 @@ from p_tqdm import p_map
 from argparse import ArgumentParser
 import pickle
 
+# Lung Masks #
 
 # def get_pixels_hu(img):
 #     image = np.stack([s.pixel_array for s in slices])
@@ -354,7 +355,6 @@ def generate_single_lung_mask(fname: str, series_id: str, config: dict) -> None:
     # np.save(os.path.join(config["f"/data/rbg/scratch/lung_ct/luna_lung_mask/sample_{exam['exam']}.npy", Mask)
 
 
-
 def get_lung_slice_range(lung_mask: np.ndarray) -> tuple[int, int]:
     """
     Given a 3D segmentation mask of the lungs, determine the range of slice numbers that the lungs cover.
@@ -471,3 +471,43 @@ def remove_flashing_entities(mask: np.ndarray, config: dict, k: int = 10) -> np.
                 output_mask[i][current_component] = 1
     
     return np.transpose(output_mask, (2, 1, 0))
+
+# Lung Vessel Mask
+
+def apply_vessel_mask_and_remove_whole_instances(instance_mask: np.ndarray, vessel_mask: np.ndarray, config: dict) -> np.ndarray:
+    """
+    Removes instances from the binarized `instance_mask` that have an overlap >= `config["overlap_threshold"]` with `vessel_mask` since they are likely to be vessels.
+
+    Args:
+        instance_mask (np.ndarray): 3D array (D, H, W) with instance IDs.
+        vessel_mask (np.ndarray): 3D binary array (D, H, W) where 1 = vessel region.
+        config (dict): Dictionary with optional "debug" flag.
+    
+    Returns:
+        np.ndarray: Binary mask with high-overlap instances removed.
+    """
+
+    overlap_threshold = config["overlap_threshold"]
+
+    instance_ids = np.unique(instance_mask)
+    instance_ids = instance_ids[instance_ids != 0] # exclude background
+
+    instances_to_keep = []
+    
+    for instance_id in instance_ids:
+        instance_mask_only = (instance_mask == instance_id)
+        intersection = np.sum(instance_mask_only & vessel_mask)
+        instance_area = np.sum(instance_mask_only)
+
+        overlap_ratio = intersection / instance_area if instance_area > 0 else 0.0
+
+        if config["debug"]:
+            print(f"Instance {instance_id}: Overlap Ratio {overlap_ratio}")
+
+        if overlap_ratio < overlap_threshold:
+            instances_to_keep.append(instance_id)
+        else:
+            if config["debug"]:
+                print(f"Removing instance {int(instance_id)} on slices {np.where(np.any(instance_mask_only, axis=(1, 2)))[0].tolist()}...")
+
+    return np.isin(instance_mask, instances_to_keep)
