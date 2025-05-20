@@ -68,6 +68,7 @@ def inference_nifti_recognition(
 def get_model(config: dict):
     """Returns the BiomedParse model."""
 
+    # TODO: target_dist.json point and config.yaml point
     opt = load_opt_from_config_files([os.path.join(os.getcwd(), "segment", "models", "BiomedParse", "configs", "biomedparse_inference.yaml")])
     opt = init_distributed(opt)
     opt["device"] = torch.device("cuda", config["device"])

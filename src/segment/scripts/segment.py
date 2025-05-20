@@ -6,28 +6,39 @@ import nibabel as nib
 import os
 from tqdm import tqdm
 import sys
+from multiprocessing import Pool
+from functools import partial
+
+num_workers = 16
+
+
+def generate_single_lung_mask_wrapper(fname, config):
+    """Wrapper that handles try-except and returns skipped series_id if any."""
+    series_id = fname.replace("_0000", "").replace(".nii.gz", "")
+
+    try:
+        if fname.endswith(".nii.gz"):
+            if not os.path.exists(os.path.join(config["dataset_dir"], "lung_masks", f"{series_id}.nii.gz")):
+                generate_single_lung_mask(fname, series_id, config)
+        return None  # not skipped
+    except Exception as e:
+        print(f"Skipping {series_id} due to error: {str(e)}")
+        return series_id
+
 
 def generate_lung_masks(config: dict) -> None:
-    """Generates all of the lung masks for the files in the input directory (except if the masks already exist.)"""
-
-    skipped = []
+    """Generates all of the lung masks for the files in the input directory using multiprocessing."""
 
     print("\n\nGenerating lung masks...")
 
-    for fname in tqdm(sorted(os.listdir(config["nifti_dir"]))):
-        if fname.endswith(".nii.gz"):
-            # try:
-            print("Bring back try-except")
-            series_id = fname.replace("_0000", "").replace(".nii.gz", "")
+    all_files = [f for f in sorted(os.listdir(config["nifti_dir"])) if f.endswith(".nii.gz")]
 
-            # only generate a lung mask if it does not yet already exist
-            if not os.path.exists(os.path.join(config["dataset_dir"], "lung_masks", f"{series_id}.npy")):
-                generate_single_lung_mask(fname, series_id, config)
-                
-            # except Exception as e:
-            #     print(f"Skipping {series_id} due to error {str(e)}...")
-            #     skipped.append(series_id)
-    
+    with Pool(processes=num_workers) as pool:
+        func = partial(generate_single_lung_mask_wrapper, config=config)
+        results = list(tqdm(pool.imap(func, all_files), total=len(all_files)))
+
+    skipped = [r for r in results if r is not None]
+
     with open(os.path.join(config["dataset_dir"], "lung_masks", "skipped.json"), "w") as f:
         json.dump(skipped, f, indent=4)
 
@@ -85,5 +96,5 @@ def main(config: dict) -> None:
     exit()
 
     # Segmentation step where we smooth the outputs with nnInteractive
-    print("\n(1) Running nnInteractive...\n\n")
+    print("\n(2) Running nnInteractive...\n\n")
     nn_interactive.main(config)

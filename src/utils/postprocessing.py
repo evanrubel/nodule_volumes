@@ -14,27 +14,6 @@ import nibabel as nib
 
 # Lung Masks #
 
-# def get_pixels_hu(img):
-#     image = np.stack([s.pixel_array for s in slices])
-#     # Convert to int16 (from sometimes int16),
-#     # should be possible as values should always be low enough (<32k)
-#     image = image.astype(np.int16)
-
-#     # Convert to Hounsfield units (HU)
-#     for slice_number in range(len(slices)):
-#         intercept = slices[slice_number].RescaleIntercept
-#         slope = slices[slice_number].RescaleSlope
-
-#         if slope != 1:
-#             image[slice_number] = slope * image[slice_number].astype(np.float64)
-#             image[slice_number] = image[slice_number].astype(np.int16)
-
-#         image[slice_number] += np.int16(intercept)
-
-#     return np.array(image, dtype=np.int16), np.array(
-#         [slices[0].SliceThickness] + list(slices[0].PixelSpacing), dtype=np.float32
-#     )
-
 def get_pixels_hu_nifti(img):
     # we transpose here to go from (x, y, z) -> (z, y, x)
     img_arr = np.transpose(img.get_fdata(dtype=np.float32), (2, 1, 0))  # ensures float representation if scaling is needed
@@ -325,11 +304,8 @@ def process_mask(mask):
 
 
 def generate_single_lung_mask(fname: str, series_id: str, config: dict) -> None:
-    # load dicoms or read volume
-    # slices = [pydicom.dcmread(p) for p in exam["paths"]]
     # case pixels: N, H, W
     # spacing: [thickness, pixel_spacing_x, pixel_spacing_y]
-    # case_pixels, spacing = get_pixels_hu(slices)
 
     img = nib.load(os.path.join(config["nifti_dir"], fname))
     case_pixels, spacing = get_pixels_hu_nifti(img)
@@ -439,44 +415,6 @@ def apply_lung_mask_and_retain_whole_instances(instance_mask: np.ndarray, lung_m
     return np.isin(instance_mask, instances_to_keep)
 
 
-def remove_flashing_entities(mask: np.ndarray, config: dict, k: int = 10) -> np.ndarray:
-    """
-    Removes any entities that "flash" when scrolling through the slices (i.e., do not overlap with any 
-    other part of the mask).
-    """
-
-    assert k % 2 == 0, "Expected k to be even."
-
-    mask = np.transpose(mask, (2, 1, 0))
-
-    num_slices = mask.shape[0]
-    output_mask = np.zeros_like(mask)
-
-    # to track persistence of objects across slices
-    prev_labels = None
-
-    for i in range(num_slices):
-        slice_mask = mask[i]
-        labeled_slice, num_features = label(slice_mask)
-
-        # count how often each label appears in adjacent slices
-        for label_id in range(1, num_features + 1):
-            current_component = (labeled_slice == label_id)
-            appears_elsewhere = False
-
-            # check if it appears in adjacent slices
-            for j in range(i - (k // 2), i + (k // 2) + 1): # look at k // 2 adjacent slices in both directions
-                if 0 <= j < num_slices and j != i:
-                    overlap = current_component & mask[j]
-                    if np.any(overlap):
-                        appears_elsewhere = True
-                        break
-
-            if appears_elsewhere:
-                output_mask[i][current_component] = 1
-    
-    return np.transpose(output_mask, (2, 1, 0))
-
 # Lung Vessel Mask
 
 def apply_vessel_mask_and_remove_whole_instances(instance_mask: np.ndarray, vessel_mask: np.ndarray, config: dict) -> np.ndarray:
@@ -516,3 +454,44 @@ def apply_vessel_mask_and_remove_whole_instances(instance_mask: np.ndarray, vess
                 print(f"Removing instance {int(instance_id)} on slices {np.where(np.any(instance_mask_only, axis=(1, 2)))[0].tolist()}...")
 
     return np.isin(instance_mask, instances_to_keep)
+
+
+# General Postprocessing #
+
+def remove_flashing_entities(mask: np.ndarray, config: dict, k: int = 10) -> np.ndarray:
+    """
+    Removes any entities that "flash" when scrolling through the slices (i.e., do not overlap with any 
+    other part of the mask).
+    """
+
+    assert k % 2 == 0, "Expected k to be even."
+
+    mask = np.transpose(mask, (2, 1, 0))
+
+    num_slices = mask.shape[0]
+    output_mask = np.zeros_like(mask)
+
+    # to track persistence of objects across slices
+    prev_labels = None
+
+    for i in range(num_slices):
+        slice_mask = mask[i]
+        labeled_slice, num_features = label(slice_mask)
+
+        # count how often each label appears in adjacent slices
+        for label_id in range(1, num_features + 1):
+            current_component = (labeled_slice == label_id)
+            appears_elsewhere = False
+
+            # check if it appears in adjacent slices
+            for j in range(i - (k // 2), i + (k // 2) + 1): # look at k // 2 adjacent slices in both directions
+                if 0 <= j < num_slices and j != i:
+                    overlap = current_component & mask[j]
+                    if np.any(overlap):
+                        appears_elsewhere = True
+                        break
+
+            if appears_elsewhere:
+                output_mask[i][current_component] = 1
+    
+    return np.transpose(output_mask, (2, 1, 0))
