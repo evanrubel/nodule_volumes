@@ -13,5 +13,9 @@ See additional documentation [here](https://docs.google.com/document/d/1My76WuBx
 4. For the nnInteractive weights, download `checkpoint_final.pth` from [here](https://huggingface.co/nnInteractive/nnInteractive/tree/main/nnInteractive_v1.0/fold_0) and put it in `src/segment/checkpoints/nnInteractive/fold0`.
 
 
+## Example Usage
+
+`cd src && python nodule_volumes.py -t segment -d toy --v`
+
 ## TODOs
 [] Figure out the conda environment `nodule_volumes` --> freeze the requirements for reproducibility

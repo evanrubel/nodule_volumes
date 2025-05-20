@@ -365,10 +365,12 @@ def get_lung_mask(series_id: str, config: dict, exam_id=None) -> np.ndarray:
 
     # TOOD: check this with NLST dataset, not just UTC
 
-    lung_mask_arr = np.load(os.path.join(config["dataset_dir"], "lung_masks", f"{series_id}.npy")).astype(np.uint8)
+    # lung_mask_arr = np.load(os.path.join(config["dataset_dir"], "lung_masks", f"{series_id}.npy")).astype(np.uint8)
 
-    # if config["dataset"] == "utc":
-    lung_mask_arr = np.rot90(np.flip(lung_mask_arr, axis=2), k=-2, axes=(1,2))
+    # # if config["dataset"] == "utc":
+    # lung_mask_arr = np.rot90(np.flip(lung_mask_arr, axis=2), k=-2, axes=(1,2))
+
+    lung_mask_arr = np.transpose(nib.load(os.path.join(config["dataset_dir"], "lung_masks", f"{series_id}.nii.gz")).get_fdata(), (2, 1, 0)).astype(np.uint8)
     
     if config["lung_mask_mode"] == "mask":
         return lung_mask_arr
@@ -419,7 +421,7 @@ def apply_lung_mask_and_retain_whole_instances(instance_mask: np.ndarray, lung_m
 
 def apply_vessel_mask_and_remove_whole_instances(instance_mask: np.ndarray, vessel_mask: np.ndarray, config: dict) -> np.ndarray:
     """
-    Removes instances from the binarized `instance_mask` that have an overlap >= `config["overlap_threshold"]` with `vessel_mask` since they are likely to be vessels.
+    Removes instances from the binarized `instance_mask` that have an overlap >= `config["lung_vessel_overlap_threshold"]` with `vessel_mask` since they are likely to be vessels.
 
     Args:
         instance_mask (np.ndarray): 3D array (D, H, W) with instance IDs.
@@ -430,7 +432,7 @@ def apply_vessel_mask_and_remove_whole_instances(instance_mask: np.ndarray, vess
         np.ndarray: Binary mask with high-overlap instances removed.
     """
 
-    overlap_threshold = config["overlap_threshold"]
+    overlap_threshold = config["lung_vessel_overlap_threshold"]
 
     instance_ids = np.unique(instance_mask)
     instance_ids = instance_ids[instance_ids != 0] # exclude background

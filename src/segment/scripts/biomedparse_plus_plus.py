@@ -68,7 +68,6 @@ def inference_nifti_recognition(
 def get_model(config: dict):
     """Returns the BiomedParse model."""
 
-    # TODO: target_dist.json point and config.yaml point
     opt = load_opt_from_config_files([os.path.join(os.getcwd(), "segment", "models", "BiomedParse", "configs", "biomedparse_inference.yaml")])
     opt = init_distributed(opt)
     opt["device"] = torch.device("cuda", config["device"])
@@ -140,10 +139,6 @@ def postprocess(raw_mask: np.ndarray, series_id: str, image, evaluator, config: 
         if config["debug"]:
             print("Premask", instance_mask_array.shape)
             print("Mask", lung_mask.shape)
-            nib.save(
-                nib.Nifti1Image(np.transpose(lung_mask, (2, 1, 0)), affine=image.affine, header=image.header),
-                os.path.join(config["output_dir"], f"{series_id.replace('_0000', '')}_lung_mask.nii.gz"),
-            )
 
         # sometimes, there are stray instance slices separated by several slices, so we use the lung *range* to clean those up
         extreme_slice_mask = get_lung_mask(series_id, config | {"lung_mask_mode": "range"})
@@ -153,7 +148,7 @@ def postprocess(raw_mask: np.ndarray, series_id: str, image, evaluator, config: 
     
     # Lung Vessel Mask
     
-    if config["use_vessel_mask"]:
+    if config["lung_vessel_overlap_threshold"] is not None:
         # keep as boolean for now
         vessel_mask_arr = nib.load(os.path.join(config["dataset_dir"], "lung_vessel_masks", f"{series_id}.nii.gz")).get_fdata() > 0 # include trachea too
 
@@ -167,8 +162,6 @@ def postprocess(raw_mask: np.ndarray, series_id: str, image, evaluator, config: 
         final_lung_vessel_mask = apply_vessel_mask_and_remove_whole_instances(instance_mask_array * final_lung_mask, vessel_mask_arr.astype(np.uint8), config)
     else:
         final_lung_vessel_mask = np.ones(mask_array.shape, dtype=np.uint8) # do nothing!
-    
-    # final_lung_mask = np.transpose(final_lung_mask, (2, 1, 0))
     
     assert is_binary_array(final_lung_mask)
 
@@ -205,7 +198,7 @@ def main(config: dict) -> None:
                 output_mask = np.zeros(image_shape)
                 
                 # run inference
-                for slice_num in range(image_shape[0])[140:240]:
+                for slice_num in range(image_shape[0]):
                     candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
 
                     if candidate_slice_mask is not None:
@@ -224,7 +217,6 @@ def main(config: dict) -> None:
                     nib.Nifti1Image(final_mask, affine=image.affine, header=image.header),
                     os.path.join(config["output_dir"], f"{series_id.replace('_0000', '')}_inital.nii.gz"),
                 )
-
             except Exception as e:
                 print(f"Skipping {series_id} due to error {str(e)}...")
                 skipped.append(series_id)

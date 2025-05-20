@@ -71,6 +71,8 @@ def generate_lung_vessel_masks(config: dict) -> None:
     
     with open(os.path.join(config["dataset_dir"], "lung_vessel_masks", "skipped.json"), "w") as f:
         json.dump(skipped, f, indent=4)
+    
+    print("\n\n")
 
 
 def main(config: dict) -> None:
