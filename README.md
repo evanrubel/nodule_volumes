@@ -17,5 +17,18 @@ See additional documentation [here](https://docs.google.com/document/d/1My76WuBx
 
 `cd src && python nodule_volumes.py -t segment -d toy --v`
 
+Specify the config
+
+{
+    "device": 0,
+    "p_f_threshold": 0.2,
+    "lung_vessel_overlap_threshold": null,
+    "lung_mask_mode": "mask",
+    "prompt_type": "mask",
+    "prompt_subset_type": "all"
+}
+
+All inputs must be folders of DICOMS (name the directory the desired series ID) or NIFTIs.
+
 ## TODOs
 [] Figure out the conda environment `nodule_volumes` --> freeze the requirements for reproducibility

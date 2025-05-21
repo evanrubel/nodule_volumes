@@ -118,5 +118,5 @@ def main(config: dict) -> None:
     print("\n(1) Running BiomedParse++ in `biomedparse`...\n")
     run_in_conda_env("biomedparse", "segment/scripts/biomedparse_plus_plus.py", config_file_path)
 
-    # print("\n(2) Running nnInteractive in `nnInteractive`...\n")
-    # run_in_conda_env("nnInteractive", "segment/scripts/nn_interactive.py", config_file_path)
+    print("\n(2) Running nnInteractive in `nnInteractive`...\n")
+    run_in_conda_env("nnInteractive", "segment/scripts/nn_interactive.py", config_file_path)

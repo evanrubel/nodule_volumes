@@ -610,3 +610,8 @@ def main(config: dict) -> None:
     
     with open(os.path.join(config["output_dir"], "nnInteractive_skipped.json"), "w") as f:
         json.dump(skipped, f, indent=4)
+
+
+if __name__ == "__main__":
+    config = get_config()
+    main(config)

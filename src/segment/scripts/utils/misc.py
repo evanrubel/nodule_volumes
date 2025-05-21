@@ -3,10 +3,15 @@ import os
 import argparse
 import json
 
+# Arrays #
+
 def is_binary_array(arr: np.ndarray) -> bool:
     """Checks whether `arr` is a binary array."""
 
     return np.isin(arr, [0, 1]).all()
+
+
+# Configuration #
 
 def get_config() -> dict:
     """Loads in the configuration file."""

@@ -102,9 +102,6 @@ def insert_p_values(model, image_array_slice: np.ndarray, image_shape: tuple, co
     assert all([(np.all(pred_mask == 0) or np.unique(pred_mask).tolist()) == [0, 1] for pred_mask in pred_masks]), "Expected all binary masks."
 
     assert len(pred_masks) <= 2, "Either two masks (both 'nodule' and 'tumor' are sufficiently confident), one mask, or no mask at all."
-    
-    if config["debug"]:
-        print(f"There are {len(pred_masks)} masks")
 
     if len(pred_masks) == 0:
         return None
@@ -144,7 +141,7 @@ def postprocess(raw_mask: np.ndarray, series_id: str, image, evaluator, config: 
         extreme_slice_mask = get_lung_mask(series_id, config | {"lung_mask_mode": "range"})
         final_lung_mask = apply_lung_mask_and_retain_whole_instances(instance_mask_array, lung_mask, config) * extreme_slice_mask
     else:
-        final_lung_mask = np.ones(mask_array.shape, dtype=np.uint8) # do nothing!
+        final_lung_mask = np.ones(instance_mask_array.shape, dtype=np.uint8) # do nothing!
     
     # Lung Vessel Mask
     
@@ -161,7 +158,7 @@ def postprocess(raw_mask: np.ndarray, series_id: str, image, evaluator, config: 
         # we incorporate the lung mask here to speed up processing
         final_lung_vessel_mask = apply_vessel_mask_and_remove_whole_instances(instance_mask_array * final_lung_mask, vessel_mask_arr.astype(np.uint8), config)
     else:
-        final_lung_vessel_mask = np.ones(mask_array.shape, dtype=np.uint8) # do nothing!
+        final_lung_vessel_mask = np.ones(instance_mask_array.shape, dtype=np.uint8) # do nothing!
     
     assert is_binary_array(final_lung_mask)
 
@@ -181,46 +178,45 @@ def main(config: dict) -> None:
 
     for fname in tqdm(sorted(os.listdir(config["nifti_dir"]))):
         if fname.endswith(".nii.gz"):
-            # try:
-            print("bring back try except")
-            series_id = fname.replace("_0000", "").replace(".nii.gz", "")
+            try:
+                series_id = fname.replace("_0000", "").replace(".nii.gz", "")
 
-            # load image
-            image = nib.load(os.path.join(config["nifti_dir"], fname))
-            image_array = np.transpose(image.get_fdata(), (2, 1, 0)) # send to (z, y, x)
+                # load image
+                image = nib.load(os.path.join(config["nifti_dir"], fname))
+                image_array = np.transpose(image.get_fdata(), (2, 1, 0)) # send to (z, y, x)
 
-            image_shape = image_array.shape
+                image_shape = image_array.shape
 
-            if config["debug"]:
-                print(f"Image Shape: {image_shape}")
-            
-            assert image_shape[1] == image_shape[2], "Expected a square image."
+                if config["debug"]:
+                    print(f"Image Shape: {image_shape}")
+                
+                assert image_shape[1] == image_shape[2], "Expected a square image."
 
-            output_mask = np.zeros(image_shape)
-            
-            # run inference
-            for slice_num in range(image_shape[0]):
-                candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
+                output_mask = np.zeros(image_shape)
+                
+                # run BiomedParse++ inference
+                for slice_num in range(image_shape[0]):
+                    candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
 
-                if candidate_slice_mask is not None:
-                    output_mask[slice_num] = candidate_slice_mask
+                    if candidate_slice_mask is not None:
+                        output_mask[slice_num] = candidate_slice_mask
 
-            postprocessed_mask = postprocess(output_mask, series_id, image, evaluator, config)
+                postprocessed_mask = postprocess(output_mask, series_id, image, evaluator, config)
 
-            final_mask = np.transpose(postprocessed_mask, (2, 1, 0))
+                final_mask = np.transpose(postprocessed_mask, (2, 1, 0))
 
-            if config["debug"]:
-                print("Mask values:", np.unique(final_mask).tolist())
-                print("Final before saving", final_mask.shape)
-            
-            # save final output
-            nib.save(
-                nib.Nifti1Image(final_mask, affine=image.affine, header=image.header),
-                os.path.join(config["output_dir"], f"{series_id.replace('_0000', '')}_initial.nii.gz"),
-            )
-            # except Exception as e:
-            #     print(f"Skipping {series_id} due to error {str(e)}...")
-            #     skipped.append(series_id)
+                if config["debug"]:
+                    print("Mask values:", np.unique(final_mask).tolist())
+                    print("Final before saving", final_mask.shape)
+                
+                # save final output
+                nib.save(
+                    nib.Nifti1Image(final_mask, affine=image.affine, header=image.header),
+                    os.path.join(config["output_dir"], f"{series_id}_initial.nii.gz"),
+                )
+            except Exception as e:
+                print(f"Skipping {series_id} due to error {str(e)}...")
+                skipped.append(series_id)
     
         with open(os.path.join(config["output_dir"], "biomedparse++_skipped.json"), "w") as f:
             json.dump(skipped, f, indent=4)

@@ -8,6 +8,23 @@ from datetime import datetime
 import json
 import os
 from pprint import pprint
+import SimpleITK as sitk
+
+
+def dicom_to_nifti(dicom_folder_path: str, nifti_path: str) -> None:
+    """
+    Converts the DICOM slices in `dicom_folder_path` to a single NIfTI file.
+    Writes the NIfTI to `nifti_path`.
+    """
+
+    assert nifti_path.endswith(".nii.gz"), "Expects a NIfTI file format."
+
+    reader = sitk.ImageSeriesReader()
+    dicom_names = reader.GetGDCMSeriesFileNames(dicom_folder_path)
+    reader.SetFileNames(dicom_names)
+    image = reader.Execute()
+    sitk.WriteImage(image, nifti_path)
+
 
 if __name__ == "__main__":
     # read in command-line arguments
@@ -45,7 +62,7 @@ if __name__ == "__main__":
     # BiomedParse++    
     assert isinstance(config["p_f_threshold"], (float, int)) and 0 <= config["p_f_threshold"] <= 1, "Expected a valid threshold for p_f."
 
-    # Postprocessing
+    # postprocessing
     assert (isinstance(config["lung_vessel_overlap_threshold"], (float, int)) and 0 <= config["lung_vessel_overlap_threshold"] <= 1) or config["lung_vessel_overlap_threshold"] is None, "Expected a valid threshold for lung_vessel_overlap."
     assert config["lung_mask_mode"] in {"mask", "range", False}
 
@@ -69,18 +86,20 @@ if __name__ == "__main__":
     with open(os.path.join(config["output_dir"], "experiment_config.json"), "w") as f:
         json.dump(config, f, indent=4)
 
-    # before we proceed, we check that all of the files in the images directory are well-formed NIfTI files
-
-    for dirpath, dirnames, filenames in os.walk(config["nifti_dir"]):
-        # TODO: test this functionality
+    # before we proceed, we check that all of the files in the images directory are DICOM directories or well-formed NIfTI files
+    for dirpath, dirnames, _ in os.walk(config["nifti_dir"]):
         for i, dirname in enumerate(dirnames):
             assert all([sub_filename.endswith(".dcm") for sub_filename in os.listdir(os.path.join(config["nifti_dir"], dirname))]), "Expected all DICOM files in the directory."
+            
+            # was not already exported to NIFTI
+            nifti_path = os.path.join(config["nifti_dir"], f"{dirname.replace('_0000', '')}_0000.nii.gz") # all input images must end in _0000
+            if os.path.isfile(nifti_path):
+                dicom_to_nifti(os.path.join(config["nifti_dir"], dirname), nifti_path)
 
-            # TODO: maybe clean up the file name?
-            dicom_to_nifti(dirname, os.path.join(config["nifti_dir"], f"{dirname}_0000.nii.gz")) # all input images must end in _0000
-
-        for filename in filenames:
-            assert filename.endswith("_0000.nii.gz"), "We only support .nii.gz files for now, and their filenames must end in _0000."
+    # only this directory
+    for fname in os.listdir(config["nifti_dir"]):
+        if os.path.isfile(os.path.join(config["nifti_dir"], fname)):
+            assert fname.endswith("_0000.nii.gz"), "We only support .nii.gz files for now, and their filenames must end in _0000."
 
     # now, we can proceed with the remainder of our pipeline
      
@@ -90,5 +109,4 @@ if __name__ == "__main__":
         register.main(config)
     elif task == "full":
         segment.main(config)
-        input("Enter here when ready!")
         register.main(config)
