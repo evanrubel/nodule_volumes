@@ -14,7 +14,7 @@ from pprint import pprint
 import pickle
 
 from utils.segment_evaluator import NoduleSegmentEvaluator
-from utils.misc import is_binary_array
+from utils.misc import is_binary_array, get_config, run_in_conda_env
 from utils.postprocessing import get_lung_slice_range, get_lung_mask, apply_lung_mask_and_retain_whole_instances, apply_vessel_mask_and_remove_whole_instances, remove_flashing_entities
 
 sys.path.append(os.path.join(os.getcwd(), "segment", "models", "BiomedParse"))
@@ -181,45 +181,51 @@ def main(config: dict) -> None:
 
     for fname in tqdm(sorted(os.listdir(config["nifti_dir"]))):
         if fname.endswith(".nii.gz"):
-            try:
-                series_id = fname.replace("_0000", "").replace(".nii.gz", "")
+            # try:
+            print("bring back try except")
+            series_id = fname.replace("_0000", "").replace(".nii.gz", "")
 
-                # load image
-                image = nib.load(os.path.join(config["nifti_dir"], fname))
-                image_array = np.transpose(image.get_fdata(), (2, 1, 0)) # send to (z, y, x)
+            # load image
+            image = nib.load(os.path.join(config["nifti_dir"], fname))
+            image_array = np.transpose(image.get_fdata(), (2, 1, 0)) # send to (z, y, x)
 
-                image_shape = image_array.shape
+            image_shape = image_array.shape
 
-                if config["debug"]:
-                    print(f"Image Shape: {image_shape}")
-                
-                assert image_shape[1] == image_shape[2], "Expected a square image."
+            if config["debug"]:
+                print(f"Image Shape: {image_shape}")
+            
+            assert image_shape[1] == image_shape[2], "Expected a square image."
 
-                output_mask = np.zeros(image_shape)
-                
-                # run inference
-                for slice_num in range(image_shape[0]):
-                    candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
+            output_mask = np.zeros(image_shape)
+            
+            # run inference
+            for slice_num in range(image_shape[0]):
+                candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
 
-                    if candidate_slice_mask is not None:
-                        output_mask[slice_num] = candidate_slice_mask
+                if candidate_slice_mask is not None:
+                    output_mask[slice_num] = candidate_slice_mask
 
-                postprocessed_mask = postprocess(output_mask, series_id, image, evaluator, config)
+            postprocessed_mask = postprocess(output_mask, series_id, image, evaluator, config)
 
-                final_mask = np.transpose(postprocessed_mask, (2, 1, 0))
+            final_mask = np.transpose(postprocessed_mask, (2, 1, 0))
 
-                if config["debug"]:
-                    print("Mask values:", np.unique(final_mask).tolist())
-                    print("Final before saving", final_mask.shape)
-                
-                # save final output
-                nib.save(
-                    nib.Nifti1Image(final_mask, affine=image.affine, header=image.header),
-                    os.path.join(config["output_dir"], f"{series_id.replace('_0000', '')}_inital.nii.gz"),
-                )
-            except Exception as e:
-                print(f"Skipping {series_id} due to error {str(e)}...")
-                skipped.append(series_id)
+            if config["debug"]:
+                print("Mask values:", np.unique(final_mask).tolist())
+                print("Final before saving", final_mask.shape)
+            
+            # save final output
+            nib.save(
+                nib.Nifti1Image(final_mask, affine=image.affine, header=image.header),
+                os.path.join(config["output_dir"], f"{series_id.replace('_0000', '')}_initial.nii.gz"),
+            )
+            # except Exception as e:
+            #     print(f"Skipping {series_id} due to error {str(e)}...")
+            #     skipped.append(series_id)
     
         with open(os.path.join(config["output_dir"], "biomedparse++_skipped.json"), "w") as f:
             json.dump(skipped, f, indent=4)
+
+
+if __name__ == "__main__":
+    config = get_config()
+    main(config)

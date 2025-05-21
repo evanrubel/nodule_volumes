@@ -1,11 +1,17 @@
-from totalsegmentator.python_api import totalsegmentator
+import os
+import sys
+
+sys.path.append(os.path.join(os.getcwd(), "segment", "scripts"))
+
 from utils.postprocessing import generate_single_lung_mask
+
+from totalsegmentator.python_api import totalsegmentator
 
 import json
 import nibabel as nib
 import os
 from tqdm import tqdm
-import sys
+import subprocess
 from multiprocessing import Pool
 from functools import partial
 
@@ -75,6 +81,11 @@ def generate_lung_vessel_masks(config: dict) -> None:
     print("\n\n")
 
 
+def run_in_conda_env(env_name, script_path, config_path):
+    command = f'bash -c "source ~/.bashrc && conda activate {env_name} && python {script_path} --config {config_path}"'
+    result = subprocess.run(command, shell=True)
+
+
 def main(config: dict) -> None:
     """The entry point for the segmentation task."""
 
@@ -86,17 +97,26 @@ def main(config: dict) -> None:
     if config["lung_vessel_overlap_threshold"] is not None:
         generate_lung_vessel_masks(config)
     
-    sys.path.append(os.path.join(os.getcwd(), "segment", "scripts"))
+    # sys.path.append(os.path.join(os.getcwd(), "segment", "scripts"))
 
-    import biomedparse_plus_plus
-    # import nn_interactive # make sure not to conflict with the nnInteractive pip package
+    # # import biomedparse_plus_plus
+    # # import nn_interactive # make sure not to conflict with the nnInteractive pip package
 
-    # Initial "detection" step with BiomedParse++
-    print("\n(1) Running BiomedParse++...\n\n")
-    biomedparse_plus_plus.main(config)
+    # # Initial "detection" step with BiomedParse++
+    # print("\n(1) Running BiomedParse++...\n\n")
+    # # biomedparse_plus_plus.main(config)
 
-    exit()
+    # exit()
+    # # input("Enter to continue...")
 
-    # Segmentation step where we smooth the outputs with nnInteractive
-    print("\n(2) Running nnInteractive...\n\n")
-    nn_interactive.main(config)
+    # # Segmentation step where we smooth the outputs with nnInteractive
+    # print("\n(2) Running nnInteractive...\n\n")
+    # # nn_interactive.main(config)
+
+    config_file_path = os.path.join(config["output_dir"], "experiment_config.json")
+
+    print("\n(1) Running BiomedParse++ in `biomedparse`...\n")
+    run_in_conda_env("biomedparse", "segment/scripts/biomedparse_plus_plus.py", config_file_path)
+
+    # print("\n(2) Running nnInteractive in `nnInteractive`...\n")
+    # run_in_conda_env("nnInteractive", "segment/scripts/nn_interactive.py", config_file_path)

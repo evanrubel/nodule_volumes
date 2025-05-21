@@ -10,7 +10,7 @@ See additional documentation [here](https://docs.google.com/document/d/1My76WuBx
 1. `git clone git@github.com:evanrubel/nodule_volumes.git`
 2. `cd src/segment/models && git clone git@github.com:evanrubel/BiomedParse.git`
 3. For the BiomedParse weights, download `biomedparse_v1.pt` from [here](https://huggingface.co/microsoft/BiomedParse/tree/main) and put it in `src/segment/checkpoints`.
-4. For the nnInteractive weights, download `checkpoint_final.pth` from [here](https://huggingface.co/nnInteractive/nnInteractive/tree/main/nnInteractive_v1.0/fold_0) and put it in `src/segment/checkpoints/nnInteractive/fold0`.
+4. For the nnInteractive weights, download `checkpoint_final.pth` from [here](https://huggingface.co/nnInteractive/nnInteractive/tree/main/nnInteractive_v1.0/fold_0) and put it in `src/segment/checkpoints/nnInteractive/fold_0`.
 
 
 ## Example Usage

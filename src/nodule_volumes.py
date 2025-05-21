@@ -2,7 +2,6 @@
 
 from segment.scripts import segment
 from register.scripts import register
-from utils import preprocessing
 
 import argparse
 from datetime import datetime

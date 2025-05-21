@@ -1,11 +1,4 @@
-import numpy as np
 import os
-
-def is_binary_array(arr: np.ndarray) -> bool:
-    """Checks whether `arr` is a binary array."""
-
-    return np.isin(arr, [0, 1]).all()
-
 
 def get_pid_to_timepoints(config: dict) -> dict:
     """Collects all of the scans that have multiple timepoints."""

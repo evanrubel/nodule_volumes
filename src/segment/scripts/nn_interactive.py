@@ -10,12 +10,14 @@ from tqdm import tqdm
 from PIL import Image
 from pprint import pprint
 import json
-from nnInteractive.inference.inference_session import nnInteractiveInferenceSession
 
 from utils.segment_evaluator import NoduleSegmentEvaluator
 from utils.postprocessing import get_lung_mask, apply_lung_mask_and_retain_whole_instances
+from utils.misc import get_config, run_in_conda_env
 
 sys.path.append(os.path.join(os.getcwd(), "segment", "models"))
+
+from nnInteractive.inference.inference_session import nnInteractiveInferenceSession
 
 
 def get_instance_bboxes(
