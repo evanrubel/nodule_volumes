@@ -96,27 +96,17 @@ def main(config: dict) -> None:
     # Generate the lung vessel masks if required and they do not already exist
     if config["lung_vessel_overlap_threshold"] is not None:
         generate_lung_vessel_masks(config)
-    
-    # sys.path.append(os.path.join(os.getcwd(), "segment", "scripts"))
-
-    # # import biomedparse_plus_plus
-    # # import nn_interactive # make sure not to conflict with the nnInteractive pip package
-
-    # # Initial "detection" step with BiomedParse++
-    # print("\n(1) Running BiomedParse++...\n\n")
-    # # biomedparse_plus_plus.main(config)
-
-    # exit()
-    # # input("Enter to continue...")
-
-    # # Segmentation step where we smooth the outputs with nnInteractive
-    # print("\n(2) Running nnInteractive...\n\n")
-    # # nn_interactive.main(config)
 
     config_file_path = os.path.join(config["output_dir"], "experiment_config.json")
 
-    print("\n(1) Running BiomedParse++ in `biomedparse`...\n")
-    run_in_conda_env("biomedparse", "segment/scripts/biomedparse_plus_plus.py", config_file_path)
+    # Initial "detection" step
+    if config["detection_model"] == "biomedparse++":
+        print("\n(1) Running BiomedParse++ in the `biomedparse` environment...\n")
+        run_in_conda_env("biomedparse", "segment/scripts/biomedparse_plus_plus.py", config_file_path)
+    elif config["detection_model"] == "total_segmentator":
+        print("\n(1) Running Total Segmentator in the `biomedparse` environment...\n")
+        run_in_conda_env("biomedparse", "segment/scripts/total_segmentator.py", config_file_path)
 
-    print("\n(2) Running nnInteractive in `nnInteractive`...\n")
+    # Segmentation step where we smooth the outputs with nnInteractive
+    print("\n(2) Running nnInteractive in the `nnInteractive` environment...\n")
     run_in_conda_env("nnInteractive", "segment/scripts/nn_interactive.py", config_file_path)

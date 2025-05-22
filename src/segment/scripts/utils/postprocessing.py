@@ -12,6 +12,8 @@ from argparse import ArgumentParser
 import pickle
 import nibabel as nib
 
+from utils.misc import is_binary_array
+
 # Lung Masks #
 
 def get_pixels_hu_nifti(img):
@@ -459,6 +461,55 @@ def apply_vessel_mask_and_remove_whole_instances(instance_mask: np.ndarray, vess
 
 
 # General Postprocessing #
+
+
+def postprocess_initial(raw_mask: np.ndarray, series_id: str, image, evaluator, config: dict) -> np.ndarray:
+    """Postprocesses the raw mask from an initial detection / rough segmentation step."""
+
+    instance_mask_array = evaluator.get_instance_segmentation(np.expand_dims(raw_mask, axis=0))[0]
+
+    # Lung Mask
+
+    if config["lung_mask_mode"] in {"mask", "range"}:
+        lung_mask = get_lung_mask(series_id, config)
+            
+        assert instance_mask_array.shape == lung_mask.shape
+        
+        if config["debug"]:
+            print("Premask", instance_mask_array.shape)
+            print("Mask", lung_mask.shape)
+
+        # sometimes, there are stray instance slices separated by several slices, so we use the lung *range* to clean those up
+        extreme_slice_mask = get_lung_mask(series_id, config | {"lung_mask_mode": "range"})
+        final_lung_mask = apply_lung_mask_and_retain_whole_instances(instance_mask_array, lung_mask, config) * extreme_slice_mask
+    else:
+        final_lung_mask = np.ones(instance_mask_array.shape, dtype=np.uint8) # do nothing!
+    
+    # Lung Vessel Mask
+    
+    if config["lung_vessel_overlap_threshold"] is not None:
+        # keep as boolean for now
+        vessel_mask_arr = nib.load(os.path.join(config["dataset_dir"], "lung_vessel_masks", f"{series_id}.nii.gz")).get_fdata() > 0 # include trachea too
+
+        # if "nlst" not in config["dataset"]:
+        vessel_mask_arr = np.transpose(vessel_mask_arr, (2, 1, 0))
+
+        assert instance_mask_array.shape == vessel_mask_arr.shape
+        assert instance_mask_array.shape == final_lung_mask.shape
+
+        # we incorporate the lung mask here to speed up processing
+        final_lung_vessel_mask = apply_vessel_mask_and_remove_whole_instances(instance_mask_array * final_lung_mask, vessel_mask_arr.astype(np.uint8), config)
+    else:
+        final_lung_vessel_mask = np.ones(instance_mask_array.shape, dtype=np.uint8) # do nothing!
+    
+    assert is_binary_array(final_lung_mask)
+
+    output_mask = raw_mask * final_lung_mask * final_lung_vessel_mask
+
+    if config["p_f_threshold"] is None:
+        return remove_flashing_entities(output_mask.astype(np.uint8), config)
+    else:
+        return remove_flashing_entities((output_mask > config["p_f_threshold"]).astype(np.uint8), config)
 
 def remove_flashing_entities(mask: np.ndarray, config: dict, k: int = 10) -> np.ndarray:
     """

@@ -324,7 +324,7 @@ def main(config: dict) -> None:
 
     # I'm sorry for all of the rotations, flips, and transpositions...
 
-    for fname in tqdm(sorted(os.listdir(config["nifti_dir"]))):
+    for fname in sorted(os.listdir(config["nifti_dir"])):
         if fname.endswith(".nii.gz"):
             # try:
             print("bring back try except")
