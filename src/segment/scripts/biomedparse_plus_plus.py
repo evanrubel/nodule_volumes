@@ -149,9 +149,7 @@ def main(config: dict) -> None:
                 output_mask = np.zeros(image_shape)
                 
                 # run BiomedParse++ inference
-                # for slice_num in range(image_shape[0]):
-                print("TODO: change back!")
-                for slice_num in range(100, 150):
+                for slice_num in range(image_shape[0]):
                     candidate_slice_mask = insert_p_values(model, image_array[slice_num], image_shape, config)
 
                     if candidate_slice_mask is not None:

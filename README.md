@@ -15,7 +15,7 @@ See additional documentation [here](https://docs.google.com/document/d/1My76WuBx
 
 ### Setting up the Data
 
-All inputs must be folders of DICOMS (name the directory the desired series ID) or NIFTIs. We also accept an array of PIDs stored in a JSON entitled `nlst_pids.json`. We then ingest all of the timepoints for each PID.
+All inputs must be folders of DICOMS (name the directory the desired series ID) or NIFTIs. The NIFTIs must end with the suffix `_0000.nii.gz` to indicate that they are input images. We also accept an array of PIDs stored in a JSON entitled `nlst_pids.json`. We then ingest all of the timepoints for each PID.
 
 ### Configuration
 

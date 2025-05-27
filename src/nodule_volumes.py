@@ -10,6 +10,7 @@ import json
 import nibabel as nib
 from nibabel.orientations import axcodes2ornt, io_orientation, inv_ornt_aff, apply_orientation
 import os
+import pandas as pd
 import pickle
 from pprint import pprint
 import shutil
@@ -105,24 +106,40 @@ def download_checkpoint(checkpoint_type: str) -> None:
             print(f"Checkpoint already exists at {local_path}")
     
 
-def import_nlst_files(file_path: str, config: dict) -> None:
-    """Based on the PIDs in the JSON at `file_path`, we save them all of their longitudinal scans as NIFTIs."""
+# def import_nlst_files(file_path: str, config: dict) -> None:
+#     """Based on the PIDs in the JSON at `file_path`, we save them all of their longitudinal scans as NIFTIs."""
 
-    with open(file_path, "rb") as f:
-        nlst_pids = json.load(f)
+#     with open(file_path, "rb") as f:
+#         nlst_pids = json.load(f)
     
-    assert isinstance(nlst_pids, list) and all([isinstance(elem, str) for elem in nlst_pids]), "Expected a well-formed input."
+#     assert isinstance(nlst_pids, list) and all([isinstance(elem, str) for elem in nlst_pids]), "Expected a well-formed input."
 
-    if len(nlst_pids) == 0:
-        return
+#     if len(nlst_pids) == 0:
+#         return
 
-    with open("/data/rbg/users/erubel/datasets/nlst/nlst_dataset.p", "rb") as f:
-        nlst_dataset = pickle.load(f)
+#     with open("/data/rbg/users/erubel/datasets/nlst/nlst_dataset.p", "rb") as f:
+#         nlst_dataset = pickle.load(f)
 
-    pid_to_dicom_directory = pickle.load(open("/data/rbg/shared/datasets/NLST/NLST/all_nlst_dicoms_pid2directory.p", "rb"))
+#     pid_to_dicom_directory = pickle.load(open("/data/rbg/shared/datasets/NLST/NLST/all_nlst_dicoms_pid2directory.p", "rb"))
 
-    for pid, tp, dir_name in [(elem["pid"], elem["screen_timepoint"], os.path.join(pid_to_dicom_directory[elem["pid"]].replace("/Mounts/rbg-storage1/datasets", "/data/rbg/shared/datasets/NLST"), elem["pid"], "/".join(elem["paths"][0].split("/")[-3:-1]))) for elem in nlst_dataset if elem["pid"] in nlst_pids]:
-        dicom_to_nifti(dir_name, os.path.join(config["nifti_dir"], f"nlst_{pid}T{tp}_0000.nii.gz"))
+#     for pid, tp, dir_name in [(elem["pid"], elem["screen_timepoint"], os.path.join(pid_to_dicom_directory[elem["pid"]].replace("/Mounts/rbg-storage1/datasets", "/data/rbg/shared/datasets/NLST"), elem["pid"], "/".join(elem["paths"][0].split("/")[-3:-1]))) for elem in nlst_dataset if elem["pid"] in nlst_pids]:
+#         dicom_to_nifti(dir_name, os.path.join(config["nifti_dir"], f"nlst_{pid}T{tp}_0000.nii.gz"))
+
+
+def export_niftis_from_csv(file_path: str, config: dict) -> None:
+    """Based on the PIDs in the csv at `file_path`, we save them all of their longitudinal scans as NIFTIs."""
+
+    # TODO: fix this when we can extract the correct series
+
+    df = pd.read_csv(file_path)
+
+    for _, row in list(df.iterrows())[:1]:
+        pid = row["PID"]
+        print(pid)
+        for tp in range(2):
+            if not pd.isna(row[f'Series_{tp}']):
+                print(row[f'Series_{tp}'])
+                dicom_to_nifti(row[f'Series_{tp}'], os.path.join(config["nifti_dir"], f"nlst_{pid}T{tp}_0000.nii.gz"))
 
 
 if __name__ == "__main__":
@@ -189,15 +206,15 @@ if __name__ == "__main__":
     with open(os.path.join(config["output_dir"], "experiment_config.json"), "w") as f:
         json.dump(config, f, indent=4)
 
-    # check if we need to import the NLST scans from their PIDs
-    if os.path.isfile(os.path.join(config["nifti_dir"], "nlst_pids.json")):
-        import_nlst_files(os.path.join(config["nifti_dir"], "nlst_pids.json"), config)
+    # # check if we need to import the NLST scans from their PIDs
+    # if os.path.isfile(os.path.join(config["nifti_dir"], "nlst_pids.json")):
+    #     import_nlst_files(os.path.join(config["nifti_dir"], "nlst_pids.json"), config)
 
     # check that all NIFTIs are in the RAS orientation
     for fname in os.listdir(config["nifti_dir"]):
         fname_path = os.path.join(config["nifti_dir"], fname)
         if os.path.isfile(fname_path):
-            assert (fname_path.endswith("_0000.nii.gz") and is_in_ras_orientation(fname_path)) or fname == "nlst_pids.json", "We only support .nii.gz files. Their filenames must end in _0000, and their corresponding images must be in the RAS orientation."
+            assert fname.endswith(".csv") or (fname_path.endswith("_0000.nii.gz") and is_in_ras_orientation(fname_path)), "We only support .nii.gz files. Their filenames must end in _0000, and their corresponding images must be in the RAS orientation."
 
     # before we proceed, we check that all of the files in the images directory are DICOM directories or well-formed NIfTI files
     for dirpath, dirnames, _ in os.walk(config["nifti_dir"]):
@@ -208,6 +225,14 @@ if __name__ == "__main__":
             nifti_path = os.path.join(config["nifti_dir"], f"{dirname.replace('_0000', '')}_0000.nii.gz") # all input images must end in _0000
             if not os.path.isfile(nifti_path):
                 dicom_to_nifti(os.path.join(config["nifti_dir"], dirname), nifti_path)
+    
+    # export the entries in any csv
+    for fname in os.listdir(config["nifti_dir"]):
+        continue
+        # TODO: fix this!
+        fname_path = os.path.join(config["nifti_dir"], fname)
+        if os.path.isfile(fname_path) and fname.endswith(".csv"):
+            export_niftis_from_csv(fname_path, config)
         
     # we next download any required checkpoints (we use local checkpoints if they were already downloaded)
     if config["detection_model"] == "biomedparse++":
