@@ -244,6 +244,7 @@ if __name__ == "__main__":
     if task == "segment":
         segment.main(config)
     elif task == "register":
+        input("WAIT HERE:")
         register.main(config)
     elif task == "full":
         segment.main(config)

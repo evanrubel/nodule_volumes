@@ -19,8 +19,8 @@ from scipy.spatial.distance import cdist
 import sys
 import copy
 from segmentation_evaluator import NoduleSegmentEvaluator, compute_volume_voxel_count
-sys.path.append('/data/rbg/users/erubel/sybil/SybilX')
-from sybilx.utils.registry import get_object
+# sys.path.append('/data/rbg/users/erubel/sybil/SybilX')
+# from sybilx.utils.registry import get_object
 
 
 def get_mask_array(mask_dir: str, exam: str, target_pid: int, timepoint: int) -> np.ndarray:
@@ -418,15 +418,15 @@ def run_matching(
 def run_one_scan(
     pid: int,
     timepoint: int,
-    pid_to_exam_by_timepoint: dict,
+    pid_to_timepoints: dict,
     evaluator_new: NoduleSegmentEvaluator,
     niftis_dir: str,
     original_mask_nifti_dir: str,
     instance_mask_nifti_dir: str,
 ) -> Union[dict, str]:
 
-    exam = pid_to_exam_by_timepoint[pid][timepoint]["exam"]
-    paths = pid_to_exam_by_timepoint[pid][timepoint]["paths"]
+    exam = pid_to_timepoints[pid][timepoint]["exam"]
+    paths = pid_to_timepoints[pid][timepoint]["paths"]
 
     mask_instance_arr = evaluator_new.get_instance_segmentation(get_mask_array(original_mask_nifti_dir, exam, pid, timepoint))
 
@@ -440,7 +440,7 @@ def run_one_scan(
 
     pixel_spacing, slice_thickness, shape = get_scan_spacing(niftis_dir, original_mask_nifti_dir, exam, pid, timepoint)
 
-    bbox_annotations = pid_to_exam_by_timepoint[pid][timepoint]["bbox_annotations"]
+    bbox_annotations = pid_to_timepoints[pid][timepoint]["bbox_annotations"]
     bbox_mask = get_annotations_mask(paths, bbox_annotations, shape)
 
     cluster_ids = np.unique(mask_instance_arr).astype(int).tolist()
@@ -479,7 +479,7 @@ def run_one_scan(
 
 def run_two_scans(
     pid: int,
-    pid_to_exam_by_timepoint: dict,
+    pid_to_timepoints: dict,
     evaluator_new: NoduleSegmentEvaluator,
     niftis_dir: str,
     original_mask_nifti_dir: str,
@@ -491,14 +491,14 @@ def run_two_scans(
     dist_thresh: float,
 ) -> Union[dict, str]:
     # TODO: change fixed to second, moving to first (for clarity)
-    fixed_timepoint = max(pid_to_exam_by_timepoint[pid]) # fix the last one
-    moving_timepoint = min(pid_to_exam_by_timepoint[pid])
+    fixed_timepoint = max(pid_to_timepoints[pid]) # fix the last one
+    moving_timepoint = min(pid_to_timepoints[pid])
 
-    fixed_exam = pid_to_exam_by_timepoint[pid][fixed_timepoint]["exam"]
-    moving_exam = pid_to_exam_by_timepoint[pid][moving_timepoint]["exam"]
+    fixed_exam = pid_to_timepoints[pid][fixed_timepoint]["exam"]
+    moving_exam = pid_to_timepoints[pid][moving_timepoint]["exam"]
 
-    fixed_paths = pid_to_exam_by_timepoint[pid][fixed_timepoint]["paths"]
-    moving_paths = pid_to_exam_by_timepoint[pid][moving_timepoint]["paths"]
+    fixed_paths = pid_to_timepoints[pid][fixed_timepoint]["paths"]
+    moving_paths = pid_to_timepoints[pid][moving_timepoint]["paths"]
 
     fixed_mask_instance_arr = evaluator_new.get_instance_segmentation(get_mask_array(original_mask_nifti_dir, fixed_exam, pid, fixed_timepoint))
     # save it
@@ -511,7 +511,7 @@ def run_two_scans(
 
     fixed_pixel_spacing, fixed_slice_thickness, fixed_shape = get_scan_spacing(niftis_dir, original_mask_nifti_dir, fixed_exam, pid, fixed_timepoint)
 
-    fixed_bbox_annotations = pid_to_exam_by_timepoint[pid][fixed_timepoint]["bbox_annotations"]
+    fixed_bbox_annotations = pid_to_timepoints[pid][fixed_timepoint]["bbox_annotations"]
     fixed_bbox_mask = get_annotations_mask(fixed_paths, fixed_bbox_annotations, fixed_shape)
     
     moving_mask_instance_arr_registered = evaluator_new.get_instance_segmentation(get_mask_array(registered_mask_nifti_dir, moving_exam, pid, moving_timepoint))
@@ -526,7 +526,7 @@ def run_two_scans(
     # the spacing is from the unregistered (original) moving image!
     moving_pixel_spacing, moving_slice_thickness, moving_shape = get_scan_spacing(niftis_dir, original_mask_nifti_dir, moving_exam, pid, moving_timepoint)
 
-    moving_bbox_annotations = pid_to_exam_by_timepoint[pid][moving_timepoint]["bbox_annotations"]
+    moving_bbox_annotations = pid_to_timepoints[pid][moving_timepoint]["bbox_annotations"]
     moving_bbox_mask = get_annotations_mask(moving_paths, moving_bbox_annotations, moving_shape)
     
     matches, unmatched, match_length = run_matching(
@@ -642,7 +642,7 @@ def run_two_scans(
         # moving_nodules = list(run_one_scan( 
         #     pid,
         #     moving_timepoint,
-        #     pid_to_exam_by_timepoint,
+        #     pid_to_timepoints,
         #     evaluator_new,
         #     niftis_dir,
         #     original_mask_nifti_dir,
@@ -652,7 +652,7 @@ def run_two_scans(
         # fixed_nodules = list(run_one_scan(
         #     pid,
         #     fixed_timepoint,
-        #     pid_to_exam_by_timepoint,
+        #     pid_to_timepoints,
         #     evaluator_new,
         #     niftis_dir,
         #     original_mask_nifti_dir,
@@ -685,7 +685,7 @@ def run_two_scans(
     #     moving_nodules = list(run_one_scan( 
     #         pid,
     #         moving_timepoint,
-    #         pid_to_exam_by_timepoint,
+    #         pid_to_timepoints,
     #         evaluator_new,
     #         niftis_dir,
     #         original_mask_nifti_dir,
@@ -695,7 +695,7 @@ def run_two_scans(
     #     fixed_nodules = list(run_one_scan(
     #         pid,
     #         fixed_timepoint,
-    #         pid_to_exam_by_timepoint,
+    #         pid_to_timepoints,
     #         evaluator_new,
     #         niftis_dir,
     #         original_mask_nifti_dir,
@@ -736,7 +736,7 @@ def run_two_scans(
     #     moving_nodules = list(run_one_scan( 
     #         pid,
     #         moving_timepoint,
-    #         pid_to_exam_by_timepoint,
+    #         pid_to_timepoints,
     #         evaluator_new,
     #         niftis_dir,
     #         original_mask_nifti_dir,
@@ -746,7 +746,7 @@ def run_two_scans(
     #     fixed_nodules = list(run_one_scan(
     #         pid,
     #         fixed_timepoint,
-    #         pid_to_exam_by_timepoint,
+    #         pid_to_timepoints,
     #         evaluator_new,
     #         niftis_dir,
     #         original_mask_nifti_dir,
@@ -803,7 +803,7 @@ def run_two_scans(
 
 def run_three_scans(
     pid: int,
-    pid_to_exam_by_timepoint: dict,
+    pid_to_timepoints: dict,
     evaluator_new: NoduleSegmentEvaluator,
     niftis_dir: str,
     original_mask_nifti_dir: str,
@@ -814,13 +814,13 @@ def run_three_scans(
     transforms_dir: str,
     dist_thresh: float,
 ) -> dict:
-    exam0 = pid_to_exam_by_timepoint[pid][0]["exam"]
-    exam1 = pid_to_exam_by_timepoint[pid][1]["exam"]
-    exam2 = pid_to_exam_by_timepoint[pid][2]["exam"]
+    exam0 = pid_to_timepoints[pid][0]["exam"]
+    exam1 = pid_to_timepoints[pid][1]["exam"]
+    exam2 = pid_to_timepoints[pid][2]["exam"]
 
-    paths0 = pid_to_exam_by_timepoint[pid][0]["paths"]
-    paths1 = pid_to_exam_by_timepoint[pid][1]["paths"]
-    paths2 = pid_to_exam_by_timepoint[pid][2]["paths"]
+    paths0 = pid_to_timepoints[pid][0]["paths"]
+    paths1 = pid_to_timepoints[pid][1]["paths"]
+    paths2 = pid_to_timepoints[pid][2]["paths"]
 
     # note that we use `registered_mask_nifti_dir` for masks 0 and 1 (moving and then registered) and `original_mask_nifti_dir` for mask 2 (fixed, not registered)
 
@@ -855,13 +855,13 @@ def run_three_scans(
     pixel_spacing2, slice_thickness2, shape2 = get_scan_spacing(niftis_dir, original_mask_nifti_dir, exam2, pid, 2)
 
     # all bbox masks and annotations are in the original images (NOT registered)
-    bbox_annotations0 = pid_to_exam_by_timepoint[pid][0]["bbox_annotations"]
+    bbox_annotations0 = pid_to_timepoints[pid][0]["bbox_annotations"]
     bbox_mask0 = get_annotations_mask(paths0, bbox_annotations0, shape0)
 
-    bbox_annotations1 = pid_to_exam_by_timepoint[pid][1]["bbox_annotations"]
+    bbox_annotations1 = pid_to_timepoints[pid][1]["bbox_annotations"]
     bbox_mask1 = get_annotations_mask(paths1, bbox_annotations1, shape1)
 
-    bbox_annotations2 = pid_to_exam_by_timepoint[pid][2]["bbox_annotations"]
+    bbox_annotations2 = pid_to_timepoints[pid][2]["bbox_annotations"]
     bbox_mask2 = get_annotations_mask(paths2, bbox_annotations2, shape2)
 
     matches, unmatched, match_length = run_matching(
@@ -918,7 +918,7 @@ def run_three_scans(
     #     nodules0 = list(run_one_scan( 
     #         pid,
     #         0,
-    #         pid_to_exam_by_timepoint,
+    #         pid_to_timepoints,
     #         evaluator_new,
     #         niftis_dir,
     #         original_mask_nifti_dir,
@@ -928,7 +928,7 @@ def run_three_scans(
     #     nodules1 = list(run_one_scan(
     #         pid,
     #         1,
-    #         pid_to_exam_by_timepoint,
+    #         pid_to_timepoints,
     #         evaluator_new,
     #         niftis_dir,
     #         original_mask_nifti_dir,
@@ -938,7 +938,7 @@ def run_three_scans(
     #     nodules2 = list(run_one_scan(
     #         pid,
     #         2,
-    #         pid_to_exam_by_timepoint,
+    #         pid_to_timepoints,
     #         evaluator_new,
     #         niftis_dir,
     #         original_mask_nifti_dir,
@@ -989,7 +989,7 @@ def run_three_scans(
             #     outputs |= run_one_scan( # treat as a single case if no matches
             #                             pid,
             #                             1,
-            #                             pid_to_exam_by_timepoint,
+            #                             pid_to_timepoints,
             #                             evaluator_new,
             #                             niftis_dir,
             #                             original_mask_nifti_dir,
@@ -1002,7 +1002,7 @@ def run_three_scans(
         # nodules1 = list(run_one_scan(
         #     pid,
         #     1,
-        #     pid_to_exam_by_timepoint,
+        #     pid_to_timepoints,
         #     evaluator_new,
         #     niftis_dir,
         #     original_mask_nifti_dir,
@@ -1133,7 +1133,7 @@ def run_three_scans(
         # nodules0 = list(run_one_scan( 
         #     pid,
         #     0,
-        #     pid_to_exam_by_timepoint,
+        #     pid_to_timepoints,
         #     evaluator_new,
         #     niftis_dir,
         #     original_mask_nifti_dir,
@@ -1143,7 +1143,7 @@ def run_three_scans(
         # nodules1 = list(run_one_scan(
         #     pid,
         #     1,
-        #     pid_to_exam_by_timepoint,
+        #     pid_to_timepoints,
         #     evaluator_new,
         #     niftis_dir,
         #     original_mask_nifti_dir,
@@ -1153,7 +1153,7 @@ def run_three_scans(
         # nodules2 = list(run_one_scan(
         #     pid,
         #     2,
-        #     pid_to_exam_by_timepoint,
+        #     pid_to_timepoints,
         #     evaluator_new,
         #     niftis_dir,
         #     original_mask_nifti_dir,
@@ -1277,7 +1277,7 @@ def get_image_path(pid: int, timepoint: int, niftis_dir: str) -> str:
     raise FileNotFoundError
 
 
-def main():
+def main(config: dict):
     # model = "nnInteractive_all_mask_min_1"
     # model = "nnInteractive_all_mask_min_2"
     # model = "nnInteractive_all_mask_min_3"
@@ -1287,17 +1287,17 @@ def main():
     # model = "frozen" # latest BMP-based
     # model = "frozen_nnunet_b3_after_lung_mask" # latest nnU-Net-based
     # model = "frozen4" # latest nnU-Net-based
-    model = "frozen5" # latest frozen
+    # model = "frozen5" # latest frozen
 
-    assert model == "frozen5"
+    # assert model == "frozen5"
 
-    is_cancer = True
+    # is_cancer = True
 
     min_cluster_size = 25 # (can also do 15)
 
     dist_thresh = 20 # considered the same cluster (changed from 10 to be more generous with registration, we still take the minimum)
 
-    group_num = 0
+    # group_num = 0
     # group_num = 1
     # group_num = 2
     # group_num = 3
@@ -1317,39 +1317,46 @@ def main():
     # group_num = 14
     # group_num = 15
 
-    start_offset = 0
+    # start_offset = 0
 
-    total_num_groups = 16
+    # total_num_groups = 16
 
-    assert group_num in range(total_num_groups)
+    # assert group_num in range(total_num_groups)
 
-    print(f"Processing {model} outputs with cluster size of {min_cluster_size} and distance thresh of {dist_thresh}...")
+    # print(f"Processing {model} outputs with cluster size of {min_cluster_size} and distance thresh of {dist_thresh}...")
 
-    if is_cancer:
-        niftis_dir = "/data/scratch/erubel/nlst/niftis"
-        registered_niftis_dir = "/data/rbg/scratch/nlst_nodules/v2/register_outputs"
-        transforms_dir = "/data/rbg/scratch/nlst_nodules/v1/transforms" # use cached outputs!
-        outputs_dir = f"/data/rbg/scratch/nlst_nodules/v2/matching/{model}"
-        original_mask_nifti_dir = f"/data/rbg/scratch/nlst_nodules/v2/masks/{model}"
-        # so many directories...
-        registered_mask_nifti_dir = f"/data/rbg/scratch/nlst_nodules/v2/registered_masks/{model}"
-        deregistered_mask_nifti_dir = f"/data/rbg/scratch/nlst_nodules/v2/deregistered_instance_masks/{model}"
+    # if is_cancer:
+    #     niftis_dir = "/data/scratch/erubel/nlst/niftis"
+    #     registered_niftis_dir = "/data/rbg/scratch/nlst_nodules/v2/register_outputs"
+    #     transforms_dir = "/data/rbg/scratch/nlst_nodules/v1/transforms" # use cached outputs!
+    #     outputs_dir = f"/data/rbg/scratch/nlst_nodules/v2/matching/{model}"
+    #     original_mask_nifti_dir = f"/data/rbg/scratch/nlst_nodules/v2/masks/{model}"
+    #     # so many directories...
+    #     registered_mask_nifti_dir = f"/data/rbg/scratch/nlst_nodules/v2/registered_masks/{model}"
+    #     deregistered_mask_nifti_dir = f"/data/rbg/scratch/nlst_nodules/v2/deregistered_instance_masks/{model}"
         
-        registered_instance_mask_nifti_dir = f"/data/rbg/scratch/nlst_nodules/v2/registered_instance_masks/{model}"
-        instance_mask_nifti_dir = f"/data/rbg/scratch/nlst_nodules/v2/instance_masks/{model}"
-    else:
-        niftis_dir = "/data/rbg/scratch/nlst_benign_nodules/niftis"
-        registered_niftis_dir = "/data/rbg/scratch/nlst_benign_nodules/v2/register_outputs"
-        transforms_dir = "/data/rbg/scratch/nlst_benign_nodules/v1/transforms" # use cached outputs!
-        outputs_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/matching/{model}"
-        original_mask_nifti_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/masks/{model}"
-        # so many directories...
-        registered_mask_nifti_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/registered_masks/{model}"
-        deregistered_mask_nifti_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/deregistered_instance_masks/{model}"
+    #     registered_instance_mask_nifti_dir = f"/data/rbg/scratch/nlst_nodules/v2/registered_instance_masks/{model}"
+    #     instance_mask_nifti_dir = f"/data/rbg/scratch/nlst_nodules/v2/instance_masks/{model}"
+    # else:
+    #     niftis_dir = "/data/rbg/scratch/nlst_benign_nodules/niftis"
+    #     registered_niftis_dir = "/data/rbg/scratch/nlst_benign_nodules/v2/register_outputs"
+    #     transforms_dir = "/data/rbg/scratch/nlst_benign_nodules/v1/transforms" # use cached outputs!
+    #     outputs_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/matching/{model}"
+    #     original_mask_nifti_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/masks/{model}"
+    #     # so many directories...
+    #     registered_mask_nifti_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/registered_masks/{model}"
+    #     deregistered_mask_nifti_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/deregistered_instance_masks/{model}"
         
-        registered_instance_mask_nifti_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/registered_instance_masks/{model}"
-        instance_mask_nifti_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/instance_masks/{model}"
+    #     registered_instance_mask_nifti_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/registered_instance_masks/{model}"
+    #     instance_mask_nifti_dir = f"/data/rbg/scratch/nlst_benign_nodules/v2/instance_masks/{model}"
 
+    niftis_dir = config["nifti_dir"]
+    transforms_dir = config["transforms_dir"]
+    outputs_dir = config["registered_masks_dir"]
+    mask_nifti_dir = config["output_dir"]
+
+    # TODO: do rest of directories
+    
     os.makedirs(outputs_dir, exist_ok=True)
     os.makedirs(deregistered_mask_nifti_dir, exist_ok=True)
     os.makedirs(registered_instance_mask_nifti_dir, exist_ok=True)
@@ -1357,71 +1364,68 @@ def main():
 
     ## Load Data
 
-    annotations = json.load(open("/data/rbg/shared/datasets/NLST/NLST/annotations_122020.json", "r"))
-    args = Namespace(**pickle.load(open('/data/rbg/users/pgmikhael/current/SybilX/logs/c32cb085afbe045d58a7c83dcb71398c.args', 'rb')))
+    # annotations = json.load(open("/data/rbg/shared/datasets/NLST/NLST/annotations_122020.json", "r"))
+    # args = Namespace(**pickle.load(open('/data/rbg/users/pgmikhael/current/SybilX/logs/c32cb085afbe045d58a7c83dcb71398c.args', 'rb')))
     
-    if is_cancer:
-        nodule_dataset = pd.read_csv('/data/rbg/users/pgmikhael/current/SybilX/notebooks/NoduleGrowth/nlst_cancer_nodules.csv')
-    else:
-        nodule_dataset = pd.read_csv('/data/rbg/users/pgmikhael/current/SybilX/notebooks/NoduleGrowth/nlst_benign_nodules_subset.csv')
+    # if is_cancer:
+    #     nodule_dataset = pd.read_csv('/data/rbg/users/pgmikhael/current/SybilX/notebooks/NoduleGrowth/nlst_cancer_nodules.csv')
+    # else:
+    #     nodule_dataset = pd.read_csv('/data/rbg/users/pgmikhael/current/SybilX/notebooks/NoduleGrowth/nlst_benign_nodules_subset.csv')
 
-    dataset = get_object(args.dataset if is_cancer else 'nlst_benign_nodules', 'dataset')(args, "test")
+    # dataset = get_object(args.dataset if is_cancer else 'nlst_benign_nodules', 'dataset')(args, "test")
 
-    pid_to_exam_by_timepoint = {}
+    # pid_to_timepoints = {}
 
-    for i, row in tqdm(enumerate(dataset.dataset), total=len(dataset.dataset), ncols=100):
-        exam = row['exam']
+    # for i, row in tqdm(enumerate(dataset.dataset), total=len(dataset.dataset), ncols=100):
+    #     exam = row['exam']
 
-        nodule_row = nodule_dataset[nodule_dataset['PID'] == int(row['pid'])]
-        tp = row['screen_timepoint']
+    #     nodule_row = nodule_dataset[nodule_dataset['PID'] == int(row['pid'])]
+    #     tp = row['screen_timepoint']
 
-        paths = row['paths']
-        pid = int(row['pid'])
+    #     paths = row['paths']
+    #     pid = int(row['pid'])
 
-        bbox_annotations = None
+    #     bbox_annotations = None
 
-        if isinstance(nodule_row[f"Annotated_{tp}"].iloc[0], str):
-            annotated_sid = [s for s in nodule_row[f"Annotated_{tp}"].iloc[0].split(';') if s == row['series']]
+    #     if isinstance(nodule_row[f"Annotated_{tp}"].iloc[0], str):
+    #         annotated_sid = [s for s in nodule_row[f"Annotated_{tp}"].iloc[0].split(';') if s == row['series']]
 
-            if len(annotated_sid) > 0:
-                bbox_annotations = annotations[annotated_sid[0]]
+    #         if len(annotated_sid) > 0:
+    #             bbox_annotations = annotations[annotated_sid[0]]
 
-        if pid in pid_to_exam_by_timepoint:
-            pid_to_exam_by_timepoint[pid][int(tp)] = {'paths': paths, 'exam': exam, 'bbox_annotations': bbox_annotations}
-        else:
-            pid_to_exam_by_timepoint[pid] = {int(tp): {'paths': paths, 'exam': exam, 'bbox_annotations': bbox_annotations}}
+    #     if pid in pid_to_timepoints:
+    #         pid_to_timepoints[pid][int(tp)] = {'paths': paths, 'exam': exam, 'bbox_annotations': bbox_annotations}
+    #     else:
+    #         pid_to_timepoints[pid] = {int(tp): {'paths': paths, 'exam': exam, 'bbox_annotations': bbox_annotations}}
 
-    print(len(pid_to_exam_by_timepoint))
+    # print(len(pid_to_timepoints))
+
+    pid_to_timepoints = get_pid_to_timepoints(config)
 
     ## Run Evaluation
 
     evaluator_new = NoduleSegmentEvaluator(min_cluster_size)
 
-    start_ix = group_num * (len(pid_to_exam_by_timepoint) // total_num_groups)
-    stop_ix = ((group_num + 1) * (len(pid_to_exam_by_timepoint) // total_num_groups)) if group_num != total_num_groups - 1 else len(pid_to_exam_by_timepoint)
-
-    print(f"From {start_ix} to {stop_ix} (exclusive)...\n")
-
     # don't recompute!
-    if os.path.isfile(os.path.join(outputs_dir, f"matching_outputs_{model}_mcs_{min_cluster_size}_new_group{group_num}.json")):
-        with open(os.path.join(outputs_dir, f"matching_outputs_{model}_mcs_{min_cluster_size}_new_group{group_num}.json"), "r") as f:
+    if os.path.isfile(os.path.join(outputs_dir, "matching_outputs.json")):
+        with open(os.path.join(outputs_dir, "matching_outputs.json"), "r") as f:
             output = json.load(f)
     else:
         output = {}
 
-    if os.path.isfile(os.path.join(outputs_dir, f"matching_skipped_{model}_mcs_{min_cluster_size}_new_group{group_num}.json")):
-        with open(os.path.join(outputs_dir, f"matching_skipped_{model}_mcs_{min_cluster_size}_new_group{group_num}.json"), "r") as f:
+    if os.path.isfile(os.path.join(outputs_dir, "matching_skipped.json")):
+        with open(os.path.join(outputs_dir, "matching_skipped.json"), "r") as f:
             skipped = json.load(f)
     else:
         skipped = []
 
 
-    for pid in tqdm(sorted(list(pid_to_exam_by_timepoint.keys()))[start_ix + start_offset:stop_ix]):
+    for pid in tqdm(sorted(list(pid_to_timepoints.keys()))):
         if pid in output:
             print(f"Skipping {pid} since it was already computed...")
             continue
     
-        num_timepoints = len(pid_to_exam_by_timepoint[pid])
+        num_timepoints = len(pid_to_timepoints[pid])
 
         assert num_timepoints in {1, 2, 3}
         assert pid not in output # each iteration is a unique patient ID
@@ -1430,7 +1434,7 @@ def main():
             if num_timepoints == 1: # no matching?
                 # TODO: maybe don't need to do this?
 
-                keys = list(pid_to_exam_by_timepoint[pid].keys())
+                keys = list(pid_to_timepoints[pid].keys())
                 assert len(keys) == 1
 
                 timepoint = keys[0]
@@ -1438,7 +1442,7 @@ def main():
                 output[pid] = run_one_scan(
                     pid,
                     timepoint,
-                    pid_to_exam_by_timepoint,
+                    pid_to_timepoints,
                     evaluator_new,
                     niftis_dir,
                     original_mask_nifti_dir,
@@ -1448,7 +1452,7 @@ def main():
             elif num_timepoints == 2:
                 output[pid] = run_two_scans(
                     pid,
-                    pid_to_exam_by_timepoint,
+                    pid_to_timepoints,
                     evaluator_new,
                     niftis_dir,
                     original_mask_nifti_dir,
@@ -1463,7 +1467,7 @@ def main():
             elif num_timepoints == 3:
                 output[pid] = run_three_scans(
                     pid,
-                    pid_to_exam_by_timepoint,
+                    pid_to_timepoints,
                     evaluator_new,
                     niftis_dir,
                     original_mask_nifti_dir,
@@ -1518,12 +1522,8 @@ def main():
             skipped.append(pid)
 
         # save at every iteration
-        with open(os.path.join(outputs_dir, f"matching_outputs_{model}_mcs_{min_cluster_size}_new_group{group_num}.json"), "w") as f:
+        with open(os.path.join(outputs_dir, "matching_outputs.json"), "w") as f:
             json.dump(output, f, indent=4)
 
-        with open(os.path.join(outputs_dir, f"matching_skipped_{model}_mcs_{min_cluster_size}_new_group{group_num}.json"), "w") as f:
+        with open(os.path.join(outputs_dir, "matching_skipped.json"), "w") as f:
             json.dump(skipped, f, indent=4)
-
-
-if __name__ == "__main__":
-    main()

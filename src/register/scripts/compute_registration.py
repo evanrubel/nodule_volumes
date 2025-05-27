@@ -14,7 +14,7 @@ import SimpleITK as sitk
 import os
 import ants
 
-from utils import get_pid_to_timepoints
+# from utils.misc import get_pid_to_timepoints
 
 
 def register_scans(nifti_dir, transforms_dir, target_pid, fixed_timepoint, moving_timepoint, dataset_name):
@@ -40,15 +40,11 @@ def register_scans(nifti_dir, transforms_dir, target_pid, fixed_timepoint, movin
         )
 
 
-def main(config: dict):
+def main(pid_to_timepoints: dict, config: dict):
     nifti_dir = config["nifti_dir"]
 
     transforms_dir = config["transforms_dir"]
     dataset_name = config["dataset_name"]
-
-    pid_to_timepoints = get_pid_to_timepoints(config)
-    
-    print(pid_to_timepoints)
 
     skipped = []
 

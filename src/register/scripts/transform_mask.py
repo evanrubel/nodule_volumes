@@ -14,8 +14,6 @@ import nibabel as nib
 import ants
 import multiprocessing as mp
 
-from utils import get_pid_to_timepoints
-
 
 def apply_to_mask(
     mask_nifti_dir,
@@ -137,7 +135,9 @@ def process_wrapper(args):
     return None
 
 
-def main(config: dict) -> None:  
+def main(pid_to_timepoints: dict, config: dict) -> None:
+    # TODO: remove me!
+    
     # nn_interactive_outputs_dir = f"/data/scratch/erubel/nlst/nnInteractive/{model}"
     # niftis_dir = "/data/scratch/erubel/nlst/niftis"
     # transforms_dir = "/data/rbg/scratch/nlst_nodules/v1/transforms" # we use the cached transforms!
@@ -150,8 +150,6 @@ def main(config: dict) -> None:
     mask_nifti_dir = config["output_dir"] # do we need this?
 
     dataset_name = config["dataset_name"]
-
-    pid_to_timepoints = get_pid_to_timepoints(config)
 
     skipped = []
 
