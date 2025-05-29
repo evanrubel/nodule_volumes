@@ -18,7 +18,10 @@ import ants
 from scipy.spatial.distance import cdist
 import sys
 import copy
-from segmentation_evaluator import NoduleSegmentEvaluator, compute_volume_voxel_count
+
+
+# from segmentation_evaluator import NoduleSegmentEvaluator, compute_volume_voxel_count
+
 # sys.path.append('/data/rbg/users/erubel/sybil/SybilX')
 # from sybilx.utils.registry import get_object
 
