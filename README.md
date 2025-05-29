@@ -1,5 +1,9 @@
 # nodule_volumes
 
+## TODOs
+[] Figure out the conda environment `nodule_volumes` --> freeze the requirements for reproducibility
+[] Change CSV to JSON (nlst_10000T0 -> full path to dicom series directory)
+
 Note that we have a synced fork for the [BiomedParse](https://github.com/evanrubel/BiomedParse) repository at `src/segment/models/BiomedParse`.
 
 See additional documentation [here](https://docs.google.com/document/d/1My76WuBxeqBuQXIBevDKrWPAox0fJdXXWl1wikzfgds/edit?usp=sharing).
@@ -72,6 +76,3 @@ After running the above script, the pipeline will generate the following directo
 2. `lung_vessel_masks` -- if applicable, the masks of the lung vessels for the input scans
 3. `results` -- timestamped directories containing the initial segmentation masks (`_initial.nii.gz`), the final segmentation masks, the registered masks, and the nodule volume outputs as a JSON.
 4. `transforms` -- cached transforms for registration
-
-## TODOs
-[] Figure out the conda environment `nodule_volumes` --> freeze the requirements for reproducibility
