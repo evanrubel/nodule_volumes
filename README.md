@@ -1,5 +1,9 @@
 # nodule_volumes
 
+## Description
+
+We present `nodule_volumes`, an open-source repository to segment and track lung nodules in longitudinal CT scans in order to assess nodule growth over time.
+
 ## TODOs
 [] Figure out the conda environment `nodule_volumes` --> freeze the requirements for reproducibility
 [] Change CSV to JSON (nlst_10000T0 -> full path to dicom series directory)
