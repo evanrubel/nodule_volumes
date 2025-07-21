@@ -2,11 +2,11 @@
 
 ## Overview
 
-**`nodule_volumes`** is an open-source framework for automatic segmentation and tracking of lung nodules across longitudinal CT scans. Designed for assessing nodule growth over time, this pipeline integrates state-of-the-art detection models with 3D segmentation and registration techniques. We developed and evaluated this framework as part of the MEng thesis entitled [**"Towards Fully Automated Volumetric Analysis of Lung Nodules in Computed Tomography"**](mit.edu) (May 2025) by Evan Rubel.
+**`nodule_volumes`** is an open-source framework for automatic segmentation and tracking of lung nodules across longitudinal CT scans. It integrates state-of-the-art detection models with 3D segmentation and registration techniques in order to assess lung nodule growth over time. We developed and evaluated this framework as part of the MEng thesis entitled [**"Towards Fully Automated Volumetric Analysis of Lung Nodules in Computed Tomography"**](mit.edu) (May 2025) by Evan Rubel.
 
-[system diagram]
-
-[results for biomedparse++?]
+<p align="center">
+   <img src="assets/growth.png" width="650"/>
+</p>
 
 ---
 
@@ -83,8 +83,6 @@ my_dataset/
 
 **Naming Convention**: Include `T0`, `T1`, or `T2` in the scan ID (e.g., `nlst_123456T1_0000.nii.gz`)
 
-[screenshot of example input folder layout]
-
 ---
 
 ## Configuration
@@ -103,7 +101,7 @@ For example, the `config.json` can look like:
 }
 ```
 
-### Key options:
+### Key Options:
 
 - `device`: CUDA device (integer)
 - `detection_model`: Choose between `biomedparse`, `biomedparse++`, or `total_segmentator`
@@ -115,8 +113,6 @@ For example, the `config.json` can look like:
 - `p_f_threshold`: increases model confidence threshold (BiomedParse++ only)
 - `prompt_type`: how nnInteractive is guided (`mask`, `bbox`, or `pos_point`)
 - `prompt_subset_type`: which prompts to use (`all`, `maximum`, or `median`)
-
-[side-by-side visual of segmentations with and without vessel filtering]
 
 ---
 
@@ -133,6 +129,12 @@ Other tasks:
 - `-t segment`: segmentation only
 - `-t register`: registration only
 
+### System Diagram
+
+<p align="center">
+   <img src="assets/system_diagram.png" width="800"/>
+</p>
+
 ---
 
 ## Output Structure
@@ -141,8 +143,8 @@ After running, outputs are saved under the corresponding dataset folder:
 
 ```text
 my_dataset/
-├── lung_masks/               # [optional] lung segmentation masks
-├── lung_vessel_masks/        # [optional] vessel masks
+├── lung_masks/               # [Optional] lung segmentation masks
+├── lung_vessel_masks/        # [Optional] vessel masks
 ├── results/
 │   └── <timestamp>/
 │       ├── *_initial.nii.gz  # Raw segmentation outputs
@@ -152,15 +154,13 @@ my_dataset/
 └── transforms/               # Cached transforms for registration
 ```
 
-[plot of nodule volume over time per patient, or a 3D render of segmentation results]
-
 ---
 
 ## Development Notes
 
 - See synced fork of [BiomedParse](https://github.com/evanrubel/BiomedParse) at `src/segment/models/BiomedParse`
 - Full project design and notes in [this document](https://docs.google.com/document/d/1My76WuBxeqBuQXIBevDKrWPAox0fJdXXWl1wikzfgds/edit?usp=sharing)
-- TODO:
+- TODOs:
   - [ ] Freeze Conda environment for reproducibility
   - [ ] Change CSV to JSON with full DICOM paths for batch processing
 
