@@ -2,7 +2,7 @@
 
 ## Overview
 
-**`nodule_volumes`** is an open-source framework for automatic segmentation and tracking of lung nodules across longitudinal CT scans. It integrates state-of-the-art detection models with 3D segmentation and registration techniques in order to assess lung nodule growth over time. We developed and evaluated this framework as part of the MEng thesis entitled [**"Towards Fully Automated Volumetric Analysis of Lung Nodules in Computed Tomography"**](https://tinyurl.com/rubelthesis) (May 2025) by Evan Rubel.
+**`nodule_volumes`** is an open-source framework for the automatic segmentation and tracking of lung nodules across longitudinal chest CT scans. It integrates state-of-the-art detection models with 3D segmentation and registration techniques in order to assess lung nodule growth over time. We developed and evaluated this framework as part of the MEng thesis entitled [**"Towards Fully Automated Volumetric Analysis of Lung Nodules in Computed Tomography"**](https://tinyurl.com/rubelthesis) (May 2025) by Evan Rubel.
 
 <p align="center">
    <img src="assets/growth.png" width="650"/>
