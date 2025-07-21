@@ -12,13 +12,13 @@
 
 ## Highlights
 
-- ✅ Supports **multi-format inputs**: NifTI, DICOM, and structured CSV
-- 🧠 Plug-and-play with pretrained models like **[BiomedParse](https://github.com/microsoft/BiomedParse)** and **[TotalSegmentator](https://github.com/wasserth/TotalSegmentator)**
-- 🎯 False-positive suppression with **lung and lung vessel masks**
-- 🧹 Smooth 3D segmentations via **[nnInteractive](https://github.com/MIC-DKFZ/nnInteractive)** refinement
-- ♻️ Full pipeline includes nodule detection and segmentation, CT scan registration, and nodule volume extraction
-- 📁 Clean data structure for seamless dataset management and result caching
-- 🔬 Built with real-world CT data in mind (e.g., [**National Lung Screening Trial**](https://www.cancer.gov/types/lung/research/nlst))
+- Supports **multi-format inputs**: NifTI, DICOM, and structured CSV
+- Plug-and-play with pretrained models like **[BiomedParse](https://github.com/microsoft/BiomedParse)** and **[TotalSegmentator](https://github.com/wasserth/TotalSegmentator)**
+- False-positive suppression with **lung and lung vessel masks**
+- Smooth 3D segmentations via **[nnInteractive](https://github.com/MIC-DKFZ/nnInteractive)** refinement
+- Full pipeline includes nodule detection and segmentation, CT scan registration, and nodule volume extraction
+- Clean data structure for seamless dataset management and result caching
+- Built with real-world CT data in mind (e.g., [**National Lung Screening Trial**](https://www.cancer.gov/types/lung/research/nlst))
 
 ---
 
