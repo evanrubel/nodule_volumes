@@ -2,7 +2,7 @@
 
 ## Overview
 
-**`nodule_volumes`** is an open-source framework for automatic segmentation and tracking of lung nodules across longitudinal CT scans. It integrates state-of-the-art detection models with 3D segmentation and registration techniques in order to assess lung nodule growth over time. We developed and evaluated this framework as part of the MEng thesis entitled [**"Towards Fully Automated Volumetric Analysis of Lung Nodules in Computed Tomography"**](mit.edu) (May 2025) by Evan Rubel.
+**`nodule_volumes`** is an open-source framework for automatic segmentation and tracking of lung nodules across longitudinal CT scans. It integrates state-of-the-art detection models with 3D segmentation and registration techniques in order to assess lung nodule growth over time. We developed and evaluated this framework as part of the MEng thesis entitled [**"Towards Fully Automated Volumetric Analysis of Lung Nodules in Computed Tomography"**](https://tinyurl.com/rubelthesis) (May 2025) by Evan Rubel.
 
 <p align="center">
    <img src="assets/growth.png" width="650"/>
@@ -12,23 +12,23 @@
 
 ## Highlights
 
-- ✅ Supports **multi-format inputs**: NIFTI, DICOM, and structured CSV
+- ✅ Supports **multi-format inputs**: NifTI, DICOM, and structured CSV
 - 🧠 Plug-and-play with pretrained models like **[BiomedParse](https://github.com/microsoft/BiomedParse)** and **[TotalSegmentator](https://github.com/wasserth/TotalSegmentator)**
 - 🎯 False-positive suppression with **lung and lung vessel masks**
 - 🧹 Smooth 3D segmentations via **[nnInteractive](https://github.com/MIC-DKFZ/nnInteractive)** refinement
-- ♻️ Full pipeline includes nodule segmentation, scan registration, and nodule volume extraction
+- ♻️ Full pipeline includes nodule detection and segmentation, CT scan registration, and nodule volume extraction
 - 📁 Clean data structure for seamless dataset management and result caching
-- 🔬 Built with real-world CT data in mind (e.g., NLST)
+- 🔬 Built with real-world CT data in mind (e.g., [**National Lung Screening Trial**](https://www.cancer.gov/types/lung/research/nlst))
 
 ---
 
 ## Table of Contents
 
 - [Installation](#installation)
-- [Data Setup](#setting-up-the-data)
+- [Data Setup](#data-setup)
 - [Configuration](#configuration)
 - [Execution](#execution)
-- [Directory Structure](#output-structure)
+- [Output Structure](#output-structure)
 - [Development Notes](#development-notes)
 - [Attribution](#attribution)
 
@@ -41,14 +41,14 @@
    git clone git@github.com:evanrubel/nodule_volumes.git
    ```
 
-2. Clone the detection model (BiomedParse) into place:
+2. Clone the nodule detection model (BiomedParse) into place:
    ```bash
    cd src/segment/models
    git clone git@github.com:evanrubel/BiomedParse.git
    ```
 
-3. Set up environments:
-   - `biomedparse` per the [BiomedParse installation guide](https://github.com/microsoft/BiomedParse?tab=readme-ov-file#installation)
+3. Set up Conda environments:
+   - `biomedparse` as per the [BiomedParse installation guide](https://github.com/microsoft/BiomedParse?tab=readme-ov-file#installation)
    - `nnInteractive`:
      ```bash
      conda create -n nnInteractive python=3.10 -y
@@ -58,7 +58,7 @@
 
 ---
 
-## Setting Up the Data
+## Data Setup
 
 Create a dataset directory:
 ```bash
@@ -69,19 +69,21 @@ Each dataset should include:
 
 ```text
 my_dataset/
-├── images/        # Input NIFTI or DICOM scans
+├── images/        # Input NifTI or DICOM scans
 ├── config.json    # Configuration file (see below)
 ```
 
-### Supported input formats (mix-and-match allowed):
+### Supported Input Formats:
 
-1. NIFTI file ending in `_0000.nii.gz` (RAS orientation)
+💡 **Tip:** We support mixing and matching each of these inputs as the pipeline will ingest all valid inputs.
+
+1. NifTI file with a scan ID ending in `_0000.nii.gz` (RAS orientation)
 2. Directory of DICOM slices (named with the scan ID)
 3. CSV with:
    - `pid`
    - `Series_0`, `Series_1`, `Series_2` → Directories for longitudinal scans
 
-**Naming Convention**: Include `T0`, `T1`, or `T2` in the scan ID (e.g., `nlst_123456T1_0000.nii.gz`)
+**Naming Convention**: Include `T0`, `T1`, or `T2` in the scan ID to indicate the scan's time point (e.g., `nlst_123456T1_0000.nii.gz`)
 
 ---
 
@@ -103,7 +105,7 @@ For example, the `config.json` can look like:
 
 ### Key Options:
 
-- `device`: CUDA device (integer)
+- `device`: CUDA device for inference (integer)
 - `detection_model`: Choose between `biomedparse`, `biomedparse++`, or `total_segmentator`
 - `lung_mask_mode`:
   - `"mask"`: excludes detections outside lung region
@@ -114,11 +116,13 @@ For example, the `config.json` can look like:
 - `prompt_type`: how nnInteractive is guided (`mask`, `bbox`, or `pos_point`)
 - `prompt_subset_type`: which prompts to use (`all`, `maximum`, or `median`)
 
+For more information about these options as well as the corresponding experimental results, please see the
+
 ---
 
 ## Execution
 
-Run the full pipeline (segmentation + registration):
+Run the full pipeline (segmentation and registration):
 
 ```bash
 cd src
@@ -151,14 +155,14 @@ my_dataset/
 │       ├── *_final.nii.gz    # Refined segmentations
 │       ├── *_registered.nii.gz
 │       └── volumes.json      # Tracked nodule volumes across time
-└── transforms/               # Cached transforms for registration
+└── transforms/               # Cached transforms for registration, allowing easy reuse
 ```
 
 ---
 
 ## Development Notes
 
-- See synced fork of [BiomedParse](https://github.com/evanrubel/BiomedParse) at `src/segment/models/BiomedParse`
+- See synced fork of [BiomedParse](https://github.com/evanrubel/BiomedParse) at `src/segment/models/BiomedParse` for more details
 - Full project design and notes in [this document](https://docs.google.com/document/d/1My76WuBxeqBuQXIBevDKrWPAox0fJdXXWl1wikzfgds/edit?usp=sharing)
 - TODOs:
   - [ ] Freeze Conda environment for reproducibility
@@ -170,4 +174,4 @@ my_dataset/
 
 This project was developed by [Evan Rubel](https://github.com/evanrubel) as part of a broader research initiative to improve our understanding of lung nodule growth.
 
-It integrates multiple third-party models under appropriate licenses. We thank [Professor Regina Barzilay](https://www.rbg.mit.edu/) and her research group for their support of this project.
+It integrates multiple third-party models under the appropriate licenses. We thank [Professor Regina Barzilay](https://www.rbg.mit.edu/) and her research group for their support of this project.
