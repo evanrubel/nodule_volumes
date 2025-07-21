@@ -1,82 +1,173 @@
 # nodule_volumes
 
-## Description
+## Overview
 
-We present `nodule_volumes`, an open-source repository to segment and track lung nodules in longitudinal CT scans in order to assess nodule growth over time.
+**`nodule_volumes`** is an open-source framework for automatic segmentation and tracking of lung nodules across longitudinal CT scans. Designed for assessing nodule growth over time, this pipeline integrates state-of-the-art detection models with 3D segmentation and registration techniques. We developed and evaluated this framework as part of the MEng thesis entitled [**"Towards Fully Automated Volumetric Analysis of Lung Nodules in Computed Tomography"**](mit.edu) (May 2025) by Evan Rubel.
 
-## TODOs
-[] Figure out the conda environment `nodule_volumes` --> freeze the requirements for reproducibility
-[] Change CSV to JSON (nlst_10000T0 -> full path to dicom series directory)
+[system diagram]
 
-Note that we have a synced fork for the [BiomedParse](https://github.com/evanrubel/BiomedParse) repository at `src/segment/models/BiomedParse`.
+[results for biomedparse++?]
 
-See additional documentation [here](https://docs.google.com/document/d/1My76WuBxeqBuQXIBevDKrWPAox0fJdXXWl1wikzfgds/edit?usp=sharing).
+---
 
+## Highlights
+
+- ✅ Supports **multi-format inputs**: NIFTI, DICOM, and structured CSV
+- 🧠 Plug-and-play with pretrained models like **[BiomedParse](https://github.com/microsoft/BiomedParse)** and **[TotalSegmentator](https://github.com/wasserth/TotalSegmentator)**
+- 🎯 False-positive suppression with **lung and lung vessel masks**
+- 🧹 Smooth 3D segmentations via **[nnInteractive](https://github.com/MIC-DKFZ/nnInteractive)** refinement
+- ♻️ Full pipeline includes nodule segmentation, scan registration, and nodule volume extraction
+- 📁 Clean data structure for seamless dataset management and result caching
+- 🔬 Built with real-world CT data in mind (e.g., NLST)
+
+---
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Data Setup](#setting-up-the-data)
+- [Configuration](#configuration)
+- [Execution](#execution)
+- [Directory Structure](#output-structure)
+- [Development Notes](#development-notes)
+- [Attribution](#attribution)
+
+---
 
 ## Installation
 
-1. `git clone git@github.com:evanrubel/nodule_volumes.git`
-2. `cd src/segment/models && git clone git@github.com:evanrubel/BiomedParse.git`
-3. Configure a conda environment called `biomedparse` as per [these](https://github.com/microsoft/BiomedParse?tab=readme-ov-file#installation) instructions.
-4. Configure a conda environment called `nnInteractive` with Python 3.10 by `conda create -n nnInteractive python=3.10 -y && conda activate nnInteractive && pip install nninteractive`.
+1. Clone this repository:
+   ```bash
+   git clone git@github.com:evanrubel/nodule_volumes.git
+   ```
 
+2. Clone the detection model (BiomedParse) into place:
+   ```bash
+   cd src/segment/models
+   git clone git@github.com:evanrubel/BiomedParse.git
+   ```
 
-## Example Usage
+3. Set up environments:
+   - `biomedparse` per the [BiomedParse installation guide](https://github.com/microsoft/BiomedParse?tab=readme-ov-file#installation)
+   - `nnInteractive`:
+     ```bash
+     conda create -n nnInteractive python=3.10 -y
+     conda activate nnInteractive
+     pip install nninteractive
+     ```
 
-### Setting up the Data
+---
 
-Once you have cloned this repository, create the directory for the input datasets by running `mkdir nodule_volumes/data`. We treat each directory in `nodule_volumes/data` as a standalone dataset which will contain the input data to process as well as any outputs. Each directory will have the following structure:
+## Setting Up the Data
 
-<pre>
+Create a dataset directory:
+```bash
+mkdir nodule_volumes/data/my_dataset
 ```
-nodule_volumes
-    data
-        my_dataset
-            images # a directory for the input data
-            config.json # see Configuration for details
 
+Each dataset should include:
+
+```text
+my_dataset/
+├── images/        # Input NIFTI or DICOM scans
+├── config.json    # Configuration file (see below)
 ```
-</pre>
 
-In the `images` directory, we accept three valid input formats:
+### Supported input formats (mix-and-match allowed):
 
-1. A NIFTI ending in `_0000.nii.gz` and in the RAS orientation
-2. A directory of DICOM slices (the name of the directory will be the corresponding scan ID)
-3. A CSV with columns `pid`, `Series_0`, `Series_1`, and `Series_2` (the latter three correspond to the directory for the scans at TP 0, 1, and 2, respectively.)
+1. NIFTI file ending in `_0000.nii.gz` (RAS orientation)
+2. Directory of DICOM slices (named with the scan ID)
+3. CSV with:
+   - `pid`
+   - `Series_0`, `Series_1`, `Series_2` → Directories for longitudinal scans
 
-You can mix and match input data of these three types, and the pipeline allows for an arbitrary number of inputs.
+**Naming Convention**: Include `T0`, `T1`, or `T2` in the scan ID (e.g., `nlst_123456T1_0000.nii.gz`)
 
-For nodule matching across longitudinal scans, make sure to include `T0`, `T1`, or `T2` in the filename immediately preceding `_0000` (e.g., `nlst_123456T0_0000.nii.gz` for a NIFTI file or `nlst_123456T0_0000` for a directory name).
+[screenshot of example input folder layout]
 
-### Configuration
+---
 
-<pre>
-```{
-    "device": 0, # [int] the GPU to use for processing
-    "detection_model": "biomedparse++", # ["biomedparse" | "biomedparse++" | "total_segmentator"]
-    "lung_mask_mode": "mask", # ["mask" | "range" | null]
-    "lung_vessel_overlap_threshold": null, # [float | null] in the range of [0, 1]
-    "p_f_threshold": 0.2, # [float] in the range of [0, 1]
-    "prompt_type": "mask", # ["mask" | "bbox" | "pos_point"]
-    "prompt_subset_type": "all" ["all" | "maximum" | "median"]
-}```
-</pre>
+## Configuration
 
-Our pipeline works in two stages.
+For example, the `config.json` can look like:
 
-1. We have an initial detection using the `detection_model` specified. With `lung_mask_mode`, we also optionally incorporate a mask of the lungs to remove any outputs outside of the lungs -- `mask` will remove any outputs outside of the lungs, `range` will remove any outputs beyond the range of z-slices (but not slices that have some part of the lungs on them), and `null` does not apply anything. Similarly, we can specify a threshold value for `lung_vessel_overlap_threshold` that incorporates the lung *vessel* mask in an effort to further reduce false positives -- a threshold value of 0.2, for instance, will remove any outputs of the mask that have an overlap of at least `lung_vessel_overlap_threshold` with the lung vessel mask. For BiomedParse++ only, we require a `p_f_threshold` between 0 and 1, which reduces false positives as we increase the threshold.
+```json
+{
+  "device": 0,
+  "detection_model": "biomedparse++",
+  "lung_mask_mode": "mask",
+  "lung_vessel_overlap_threshold": null,
+  "p_f_threshold": 0.2,
+  "prompt_type": "mask",
+  "prompt_subset_type": "all"
+}
+```
 
-2. We use [nnInteractive](https://github.com/MIC-DKFZ/nnInteractive) to smooth the segmentation outputs in 3D. We prompt `nnInteractive` based on the `prompt_type`, and we also specify what subset of prompts to use with `prompt_subset_type`.
+### Key options:
 
-### Execution
+- `device`: CUDA device (integer)
+- `detection_model`: Choose between `biomedparse`, `biomedparse++`, or `total_segmentator`
+- `lung_mask_mode`:
+  - `"mask"`: excludes detections outside lung region
+  - `"range"`: limits by z-slice range
+  - `null`: no masking
+- `lung_vessel_overlap_threshold`: filter based on vessel overlap (a floating point value between 0 and 1, inclusive)
+- `p_f_threshold`: increases model confidence threshold (BiomedParse++ only)
+- `prompt_type`: how nnInteractive is guided (`mask`, `bbox`, or `pos_point`)
+- `prompt_subset_type`: which prompts to use (`all`, `maximum`, or `median`)
 
-With the `-t` flag, specify the task to execute (`segment`, `register`, or `full` which performs both in sequence). With the `-d` flag, specify the dataset to process (i.e., the directory name [`my_dataset`, for instance, as above]). `--v` shows verbose outputs.
+[side-by-side visual of segmentations with and without vessel filtering]
 
-`cd src && python nodule_volumes.py -t full -d nlst --v`
+---
 
-After running the above script, the pipeline will generate the following directories within the dataset directory:
+## Execution
 
-1. `lung_masks` -- if applicable, the masks of the lungs for the input scans
-2. `lung_vessel_masks` -- if applicable, the masks of the lung vessels for the input scans
-3. `results` -- timestamped directories containing the initial segmentation masks (`_initial.nii.gz`), the final segmentation masks, the registered masks, and the nodule volume outputs as a JSON.
-4. `transforms` -- cached transforms for registration
+Run the full pipeline (segmentation + registration):
+
+```bash
+cd src
+python nodule_volumes.py -t full -d my_dataset --v
+```
+
+Other tasks:
+- `-t segment`: segmentation only
+- `-t register`: registration only
+
+---
+
+## Output Structure
+
+After running, outputs are saved under the corresponding dataset folder:
+
+```text
+my_dataset/
+├── lung_masks/               # [optional] lung segmentation masks
+├── lung_vessel_masks/        # [optional] vessel masks
+├── results/
+│   └── <timestamp>/
+│       ├── *_initial.nii.gz  # Raw segmentation outputs
+│       ├── *_final.nii.gz    # Refined segmentations
+│       ├── *_registered.nii.gz
+│       └── volumes.json      # Tracked nodule volumes across time
+└── transforms/               # Cached transforms for registration
+```
+
+[plot of nodule volume over time per patient, or a 3D render of segmentation results]
+
+---
+
+## Development Notes
+
+- See synced fork of [BiomedParse](https://github.com/evanrubel/BiomedParse) at `src/segment/models/BiomedParse`
+- Full project design and notes in [this document](https://docs.google.com/document/d/1My76WuBxeqBuQXIBevDKrWPAox0fJdXXWl1wikzfgds/edit?usp=sharing)
+- TODO:
+  - [ ] Freeze Conda environment for reproducibility
+  - [ ] Change CSV to JSON with full DICOM paths for batch processing
+
+---
+
+## Attribution
+
+This project was developed by [Evan Rubel](https://github.com/evanrubel) as part of a broader research initiative to improve our understanding of lung nodule growth.
+
+It integrates multiple third-party models under appropriate licenses. We thank [Professor Regina Barzilay](https://www.rbg.mit.edu/) and her research group for their support of this project.
